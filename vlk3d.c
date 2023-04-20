@@ -3,11 +3,12 @@
 #include <math.h>
 #include <float.h>
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_image.h>
 
 /* The simplest game skeleton.
 
    Compile with something like:
-   gcc -o vlk3d vlk3d.c (sdl2-config --cflags --libs) -lm; and ./vlk3d
+   gcc -o vlk3d vlk3d.c (sdl2-config --cflags --libs) -lm -lSDL2_image; and ./vlk3d
 */
 
 
@@ -53,6 +54,9 @@ typedef struct Projectile {
 #define PROJECTILE_COLOR_B 0
 
 Projectile *projectiles = NULL;
+
+// Add a global variable for the wall texture
+SDL_Texture *wall_texture = NULL;
 
 /* Game state */
 
@@ -107,10 +111,31 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // Load the wall texture
+    SDL_Surface *wall_surface = IMG_Load("wall.bmp");
+    if (wall_surface == NULL) {
+        fprintf(stderr, "Failed to load wall texture: %s\n", IMG_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+    wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
+    SDL_FreeSurface(wall_surface);
+
+    if (wall_texture == NULL) {
+        fprintf(stderr, "Failed to create wall texture: %s\n", SDL_GetError());
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
     game_loop(window, renderer);
 
     free_projectiles();
 
+    SDL_DestroyTexture(wall_texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -181,14 +206,26 @@ void render(SDL_Renderer *renderer) {
         float angle = player.direction - FOV / 2.0 + FOV * i / (float)RAY_COUNT;
         float raw_distance = cast_ray(angle);
         float corrected_distance = raw_distance * cosf(player.direction - angle); // Correct the fishbowl effect
-        int lineHeight = (int)(WINDOW_HEIGHT / corrected_distance);
+        int line_height = (int)(WINDOW_HEIGHT / corrected_distance);
 
-        int color = (int)(255 * (1 - corrected_distance / MAX_DISTANCE));
-        color = color > 255 ? 255 : (color < 0 ? 0 : color);
+        // Calculate the direction vector
+        Vector2 direction = {cosf(angle), sinf(angle)};
 
-        SDL_SetRenderDrawColor(renderer, color, color, color, 255);
-        SDL_RenderDrawLine(renderer, i * (WINDOW_WIDTH / RAY_COUNT), (WINDOW_HEIGHT - lineHeight) / 2, i * (WINDOW_WIDTH / RAY_COUNT), (WINDOW_HEIGHT + lineHeight) / 2);
-    }
+        // Calculate the texture coordinate
+        Vector2 hit_position = {player.x + direction.x * raw_distance, player.y + direction.y * raw_distance};
+        float tex_x = fmod(hit_position.x * (1 - direction.x) + hit_position.y * direction.x, 1);
+        if (tex_x < 0) tex_x += 1;
+
+        // Set the source rectangle for the texture
+        int texture_w, texture_h;
+        SDL_QueryTexture(wall_texture, NULL, NULL, &texture_w, &texture_h);
+        SDL_Rect src_rect = {(int)(tex_x * texture_w), 0, 1, texture_h};
+
+        // Set the destination rectangle for the texture
+        SDL_Rect dest_rect = {i * (WINDOW_WIDTH / RAY_COUNT), (WINDOW_HEIGHT - line_height) / 2, (WINDOW_WIDTH / RAY_COUNT), line_height};
+
+        // Render the textured wall
+        SDL_RenderCopy(renderer, wall_texture, &src_rect, &dest_rect);    }
 }
 
 float cast_ray(float angle) {
