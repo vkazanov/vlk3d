@@ -213,7 +213,12 @@ void render(SDL_Renderer *renderer) {
 
         // Calculate the texture coordinate
         Vector2 hit_position = {player.x + direction.x * raw_distance, player.y + direction.y * raw_distance};
-        float tex_x = fmod(hit_position.x * (1 - direction.x) + hit_position.y * direction.x, 1);
+        float tex_x;
+        if (fabs(direction.x) > fabs(direction.y)) {
+            tex_x = fmod(hit_position.y, 1);
+        } else {
+            tex_x = fmod(hit_position.x, 1);
+        }
         if (tex_x < 0) tex_x += 1;
 
         // Set the source rectangle for the texture
@@ -225,7 +230,8 @@ void render(SDL_Renderer *renderer) {
         SDL_Rect dest_rect = {i * (WINDOW_WIDTH / RAY_COUNT), (WINDOW_HEIGHT - line_height) / 2, (WINDOW_WIDTH / RAY_COUNT), line_height};
 
         // Render the textured wall
-        SDL_RenderCopy(renderer, wall_texture, &src_rect, &dest_rect);    }
+        SDL_RenderCopy(renderer, wall_texture, &src_rect, &dest_rect);
+    }
 }
 
 float cast_ray(float angle) {
