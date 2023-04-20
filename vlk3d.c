@@ -47,7 +47,7 @@ typedef struct Projectile {
     struct Projectile *next;
 } Projectile;
 
-#define PROJECTILE_SPEED 0.3
+#define PROJECTILE_SPEED 0.1
 #define PROJECTILE_COLOR_R 255
 #define PROJECTILE_COLOR_G 0
 #define PROJECTILE_COLOR_B 0
@@ -257,21 +257,25 @@ void render_projectiles(SDL_Renderer *renderer) {
 
     while (current != NULL) {
         float angle = atan2f(current->position.y - player.y, current->position.x - player.x);
-        float distance_to_player = sqrtf(powf(current->position.x - player.x, 2) + powf(current->position.y - player.y, 2));
+        float distance_to_projectile = sqrtf(powf(current->position.x - player.x, 2) + powf(current->position.y - player.y, 2));
         float relative_angle = player.direction - angle;
 
         // Check if the projectile is in the player's field of view
         if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
-            float distance = cast_ray(&player, angle);
-            int lineHeight = (int)(WINDOW_HEIGHT / distance);
+            float distance_to_wall = cast_ray(&player, angle);
+            int lineHeight = (int)(WINDOW_HEIGHT / distance_to_projectile);
             int screenWidth = (int)(WINDOW_WIDTH / (float)RAY_COUNT);
 
             // Calculate the horizontal position of the projectile on the screen
-            int screenX = (int)((WINDOW_WIDTH / 2) + tanf(relative_angle) * distance_to_player * screenWidth);
+            int screenX = (int)((WINDOW_WIDTH / 2) + tanf(relative_angle) * distance_to_projectile * screenWidth);
 
-            // Set the color and render the projectile as a vertical line
+            // Calculate the size of the projectile square, taking perspective into account
+            int squareSize = (int)(lineHeight * 0.2);
+
+            // Set the color and render the projectile as a square
             SDL_SetRenderDrawColor(renderer, PROJECTILE_COLOR_R, PROJECTILE_COLOR_G, PROJECTILE_COLOR_B, 255);
-            SDL_RenderDrawLine(renderer, screenX, (WINDOW_HEIGHT - lineHeight) / 2, screenX, (WINDOW_HEIGHT + lineHeight) / 2);
+            SDL_Rect square = {screenX - squareSize / 2, (WINDOW_HEIGHT - lineHeight) / 2 + (lineHeight - squareSize) / 2, squareSize, squareSize};
+            SDL_RenderFillRect(renderer, &square);
         }
 
         current = current->next;
