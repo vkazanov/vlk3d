@@ -128,12 +128,10 @@ void game_loop(SDL_Window *window, SDL_Renderer *renderer) {
         }
 
         update_projectiles();
-
         render(renderer, &player);
         render_projectiles(renderer);
 
         SDL_RenderPresent(renderer);
-
         SDL_Delay(16);
     }
 }
@@ -191,8 +189,6 @@ void render(SDL_Renderer *renderer, Player *player) {
         SDL_SetRenderDrawColor(renderer, color, color, color, 255);
         SDL_RenderDrawLine(renderer, i * (WINDOW_WIDTH / RAY_COUNT), (WINDOW_HEIGHT - lineHeight) / 2, i * (WINDOW_WIDTH / RAY_COUNT), (WINDOW_HEIGHT + lineHeight) / 2);
     }
-
-    SDL_RenderPresent(renderer);
 }
 
 float cast_ray(Player *player, float angle) {
