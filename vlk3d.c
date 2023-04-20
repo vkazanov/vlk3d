@@ -20,6 +20,8 @@
 #define RAY_COUNT (WINDOW_WIDTH)
 #define MAX_DISTANCE 20.0
 
+#define MAP_WIDTH 6
+#define MAP_HEIGHT 6
 
 /* Types/typedefs */
 
@@ -54,7 +56,7 @@ Projectile *projectiles = NULL;
 
 /* Game state */
 
-int map[6][6] = {
+int map[MAP_HEIGHT][MAP_WIDTH] = {
     {1, 1, 1, 1, 1, 1},
     {1, 1, 0, 0, 0, 1},
     {1, 0, 0, 0, 0, 1},
@@ -206,7 +208,7 @@ float cast_ray(Player *player, float angle) {
         int mapX = (int)floor(position.x);
         int mapY = (int)floor(position.y);
 
-        if (mapX >= 0 && mapX < 6 && mapY >= 0 && mapY < 6 && map[mapY][mapX] == 1) {
+        if (mapX >= 0 && mapX < MAP_WIDTH && mapY >= 0 && mapY < MAP_HEIGHT && map[mapY][mapX] == 1) {
             break;
         }
     }
@@ -218,7 +220,7 @@ bool is_wall_collision(float x, float y) {
     int mapX = (int)floor(x);
     int mapY = (int)floor(y);
 
-    if (mapX >= 0 && mapX < 6 && mapY >= 0 && mapY < 6 && map[mapY][mapX] == 1) {
+    if (mapX >= 0 && mapX < MAP_WIDTH && mapY >= 0 && mapY < MAP_HEIGHT && map[mapY][mapX] == 1) {
         return true;
     }
 
