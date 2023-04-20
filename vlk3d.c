@@ -21,9 +21,6 @@
 #define RAY_COUNT (WINDOW_WIDTH)
 #define MAX_DISTANCE 20.0
 
-int map_width;
-int map_height;
-
 /* Types/typedefs */
 
 typedef struct {
@@ -41,8 +38,6 @@ typedef struct {
 #define PLAYER_ROTATION_SPEED 0.1
 #define PLAYER_MOVEMENT_SPEED 0.1
 
-
-
 typedef struct Projectile {
     Vector2 position;
     Vector2 direction;
@@ -54,16 +49,18 @@ typedef struct Projectile {
 #define PROJECTILE_COLOR_G 0
 #define PROJECTILE_COLOR_B 0
 
-Projectile *projectiles = NULL;
 
-// Add a global variable for the wall texture
 SDL_Texture *wall_texture = NULL;
 
 /* Game state */
 
-int **map;
+Projectile *projectiles = NULL;
 
-Player player = {0, 0, 0}; // Starting position will be set by the load_map function
+int **map;
+int map_width;
+int map_height;
+
+Player player = {0, 0, 0};
 
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
