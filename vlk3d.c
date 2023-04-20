@@ -21,8 +21,8 @@
 #define RAY_COUNT (WINDOW_WIDTH)
 #define MAX_DISTANCE 20.0
 
-#define MAP_WIDTH 12
-#define MAP_HEIGHT 12
+int map_width;
+int map_height;
 
 /* Types/typedefs */
 
@@ -60,7 +60,7 @@ SDL_Texture *wall_texture = NULL;
 
 /* Game state */
 
-int map[MAP_HEIGHT][MAP_WIDTH];
+int **map;
 
 Player player = {2.0, 2.0, 0.0};
 
@@ -76,6 +76,7 @@ void update_projectiles();
 void render_projectiles(SDL_Renderer *renderer);
 void fire_projectile();
 void free_projectiles();
+void free_map();
 
 void load_map(const char *filename);
 
@@ -130,6 +131,7 @@ int main(int argc, char *argv[]) {
     game_loop(window, renderer);
 
     free_projectiles();
+    free_map();
 
     SDL_DestroyTexture(wall_texture);
     SDL_DestroyRenderer(renderer);
@@ -250,7 +252,7 @@ float cast_ray(float angle) {
         int mapX = (int)floor(position.x);
         int mapY = (int)floor(position.y);
 
-        if (mapX >= 0 && mapX < MAP_WIDTH && mapY >= 0 && mapY < MAP_HEIGHT && map[mapY][mapX] == 1) {
+        if (mapX >= 0 && mapX < map_width && mapY >= 0 && mapY < map_height && map[mapY][mapX] == 1) {
             break;
         }
     }
@@ -262,7 +264,7 @@ bool is_wall_collision(float x, float y) {
     int mapX = (int)floor(x);
     int mapY = (int)floor(y);
 
-    if (mapX >= 0 && mapX < MAP_WIDTH && mapY >= 0 && mapY < MAP_HEIGHT && map[mapY][mapX] == 1) {
+    if (mapX >= 0 && mapX < map_width && mapY >= 0 && mapY < map_height && map[mapY][mapX] == 1) {
         return true;
     }
 
@@ -351,13 +353,22 @@ void load_map(const char *filename) {
         exit(1);
     }
 
-    for (int i = 0; i < MAP_HEIGHT; i++) {
-        for (int j = 0; j < MAP_WIDTH; j++) {
-            int value;
-            fscanf(file, "%d", &value);
-            map[i][j] = value;
+    fscanf(file, "%d %d", &map_width, &map_height);
+
+    map = (int **)malloc(map_height * sizeof(int *));
+    for (int y = 0; y < map_height; y++) {
+        map[y] = (int *)malloc(map_width * sizeof(int));
+        for (int x = 0; x < map_width; x++) {
+            fscanf(file, "%1d", &map[y][x]);
         }
     }
 
     fclose(file);
+}
+
+void free_map() {
+    for (int y = 0; y < map_height; y++) {
+        free(map[y]);
+    }
+    free(map);
 }
