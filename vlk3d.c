@@ -83,6 +83,7 @@ float cast_ray(float angle);
 bool is_wall_collision(float x, float y);
 bool is_close_to_enemy(float x, float y);
 bool is_line_of_sight_blocked(Vector2 start, Vector2 end);
+bool has_no_enemies();
 
 void update_projectiles();
 void render_projectiles(SDL_Renderer *renderer);
@@ -164,16 +165,21 @@ void game_loop(SDL_Window *window, SDL_Renderer *renderer) {
         }
 
         if (is_close_to_enemy(player.x, player.y)) {
-            is_running = false;
-        } else {
-            update_projectiles();
-            render(renderer);
-            render_projectiles(renderer);
-            render_enemies(renderer);
-
-            SDL_RenderPresent(renderer);
-            SDL_Delay(16);
+            break;
         }
+
+        if (has_no_enemies()) {
+            break;
+        }
+
+        update_projectiles();
+        render(renderer);
+        render_projectiles(renderer);
+        render_enemies(renderer);
+
+        SDL_RenderPresent(renderer);
+        SDL_Delay(16);
+
     }
 }
 
@@ -324,6 +330,14 @@ bool is_line_of_sight_blocked(Vector2 start, Vector2 end) {
     return false;
 }
 
+bool has_no_enemies() {
+    for (int i = 0; i < num_enemies; i++) {
+        if (!enemies[i].harmless) {
+            return false;
+        }
+    }
+    return true;
+}
 
 void update_projectiles() {
     Projectile *current = projectiles;
