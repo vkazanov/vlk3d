@@ -70,14 +70,14 @@ Player player = {2.0, 2.0, 0.0};
 /* Function prototypes */
 
 void game_loop(SDL_Window *window, SDL_Renderer *renderer);
-void handle_events(SDL_Event *event, bool *is_running, Player *player);
-void render(SDL_Renderer *renderer, Player *player);
-float cast_ray(Player *player, float angle);
+void handle_events(SDL_Event *event, bool *is_running);
+void render(SDL_Renderer *renderer);
+float cast_ray(float angle);
 bool is_wall_collision(float x, float y);
 
 void update_projectiles();
 void render_projectiles(SDL_Renderer *renderer);
-void fire_projectile(Player *player);
+void fire_projectile();
 void free_projectiles();
 
 int main(int argc, char *argv[]) {
@@ -124,11 +124,11 @@ void game_loop(SDL_Window *window, SDL_Renderer *renderer) {
 
     while (is_running) {
         while (SDL_PollEvent(&event)) {
-            handle_events(&event, &is_running, &player);
+            handle_events(&event, &is_running);
         }
 
         update_projectiles();
-        render(renderer, &player);
+        render(renderer);
         render_projectiles(renderer);
 
         SDL_RenderPresent(renderer);
@@ -136,7 +136,7 @@ void game_loop(SDL_Window *window, SDL_Renderer *renderer) {
     }
 }
 
-void handle_events(SDL_Event *event, bool *is_running, Player *player) {
+void handle_events(SDL_Event *event, bool *is_running) {
     switch (event->type) {
     case SDL_QUIT:
         *is_running = false;
@@ -148,23 +148,23 @@ void handle_events(SDL_Event *event, bool *is_running, Player *player) {
         } else if (event->key.keysym.sym == SDLK_SPACE) {
             fire_projectile(player);
         } else if (event->key.keysym.sym == SDLK_UP) {
-            float newX = player->x + cosf(player->direction) * PLAYER_MOVEMENT_SPEED;
-            float newY = player->y + sinf(player->direction) * PLAYER_MOVEMENT_SPEED;
+            float newX = player.x + cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
+            float newY = player.y + sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
             if (!is_wall_collision(newX, newY)) {
-                player->x = newX;
-                player->y = newY;
+                player.x = newX;
+                player.y = newY;
             }
         } else if (event->key.keysym.sym == SDLK_DOWN) {
-            float newX = player->x - cosf(player->direction) * PLAYER_MOVEMENT_SPEED;
-            float newY = player->y - sinf(player->direction) * PLAYER_MOVEMENT_SPEED;
+            float newX = player.x - cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
+            float newY = player.y - sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
             if (!is_wall_collision(newX, newY)) {
-                player->x = newX;
-                player->y = newY;
+                player.x = newX;
+                player.y = newY;
             }
         } else if (event->key.keysym.sym == SDLK_LEFT) {
-            player->direction -= PLAYER_ROTATION_SPEED;
+            player.direction -= PLAYER_ROTATION_SPEED;
         } else if (event->key.keysym.sym == SDLK_RIGHT) {
-            player->direction += PLAYER_ROTATION_SPEED;
+            player.direction += PLAYER_ROTATION_SPEED;
         }
         break;
         /* Handle other event types here */
@@ -173,14 +173,14 @@ void handle_events(SDL_Event *event, bool *is_running, Player *player) {
     }
 }
 
-void render(SDL_Renderer *renderer, Player *player) {
+void render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
     for (int i = 0; i < RAY_COUNT; i++) {
-        float angle = player->direction - FOV / 2.0 + FOV * i / (float)RAY_COUNT;
-        float raw_distance = cast_ray(player, angle);
-        float corrected_distance = raw_distance * cosf(player->direction - angle); // Correct the fishbowl effect
+        float angle = player.direction - FOV / 2.0 + FOV * i / (float)RAY_COUNT;
+        float raw_distance = cast_ray(angle);
+        float corrected_distance = raw_distance * cosf(player.direction - angle); // Correct the fishbowl effect
         int lineHeight = (int)(WINDOW_HEIGHT / corrected_distance);
 
         int color = (int)(255 * (1 - corrected_distance / MAX_DISTANCE));
@@ -191,10 +191,10 @@ void render(SDL_Renderer *renderer, Player *player) {
     }
 }
 
-float cast_ray(Player *player, float angle) {
+float cast_ray(float angle) {
     Vector2 direction = {cosf(angle), sinf(angle)};
     float distance = 0.0;
-    Vector2 position = {player->x, player->y};
+    Vector2 position = {player.x, player.y};
 
     while (distance < MAX_DISTANCE) {
         position.x += direction.x * 0.1;
@@ -276,10 +276,10 @@ void render_projectiles(SDL_Renderer *renderer) {
     }
 }
 
-void fire_projectile(Player *player) {
+void fire_projectile(void) {
     Projectile *new_projectile = (Projectile *)malloc(sizeof(Projectile));
-    new_projectile->position = (Vector2){player->x, player->y};
-    new_projectile->direction = (Vector2){cosf(player->direction), sinf(player->direction)};
+    new_projectile->position = (Vector2){player.x, player.y};
+    new_projectile->direction = (Vector2){cosf(player.direction), sinf(player.direction)};
     new_projectile->next = projectiles;
 
     projectiles = new_projectile;
