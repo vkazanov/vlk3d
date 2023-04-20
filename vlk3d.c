@@ -42,6 +42,7 @@ typedef struct {
 #define PLAYER_MOVEMENT_SPEED 0.1
 
 
+
 typedef struct Projectile {
     Vector2 position;
     Vector2 direction;
@@ -64,6 +65,18 @@ int **map;
 
 Player player = {0, 0, 0}; // Starting position will be set by the load_map function
 
+#define ENEMY_PROXIMITY_DISTANCE 0.5
+
+typedef struct {
+    float x;
+    float y;
+} Enemy;
+
+#define MAX_ENEMIES 50
+Enemy enemies[MAX_ENEMIES];
+int num_enemies = 0;
+
+
 /* Function prototypes */
 
 void game_loop(SDL_Window *window, SDL_Renderer *renderer);
@@ -71,9 +84,12 @@ void handle_events(SDL_Event *event, bool *is_running);
 void render(SDL_Renderer *renderer);
 float cast_ray(float angle);
 bool is_wall_collision(float x, float y);
+bool is_close_to_enemy(float x, float y);
+bool is_line_of_sight_blocked(Vector2 start, Vector2 end);
 
 void update_projectiles();
 void render_projectiles(SDL_Renderer *renderer);
+void render_enemies(SDL_Renderer *renderer);
 void fire_projectile();
 void free_projectiles();
 void free_map();
@@ -150,12 +166,17 @@ void game_loop(SDL_Window *window, SDL_Renderer *renderer) {
             handle_events(&event, &is_running);
         }
 
-        update_projectiles();
-        render(renderer);
-        render_projectiles(renderer);
+        if (is_close_to_enemy(player.x, player.y)) {
+            is_running = false;
+        } else {
+            update_projectiles();
+            render(renderer);
+            render_projectiles(renderer);
+            render_enemies(renderer);
 
-        SDL_RenderPresent(renderer);
-        SDL_Delay(16);
+            SDL_RenderPresent(renderer);
+            SDL_Delay(16);
+        }
     }
 }
 
@@ -271,6 +292,42 @@ bool is_wall_collision(float x, float y) {
     return false;
 }
 
+bool is_close_to_enemy(float x, float y) {
+    for (int i = 0; i < num_enemies; i++) {
+        float distance = sqrtf(powf(x - enemies[i].x, 2) + powf(y - enemies[i].y, 2));
+        if (distance < ENEMY_PROXIMITY_DISTANCE) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool is_line_of_sight_blocked(Vector2 start, Vector2 end) {
+    Vector2 direction = {end.x - start.x, end.y - start.y};
+    float distance = sqrtf(direction.x * direction.x + direction.y * direction.y);
+    direction.x /= distance;
+    direction.y /= distance;
+
+    float current_distance = 0.0;
+    Vector2 position = {start.x, start.y};
+
+    while (current_distance < distance) {
+        position.x += direction.x * 0.1;
+        position.y += direction.y * 0.1;
+        current_distance += 0.1;
+
+        int mapX = (int)floor(position.x);
+        int mapY = (int)floor(position.y);
+
+        if (mapX >= 0 && mapX < map_width && mapY >= 0 && mapY < map_height && map[mapY][mapX] == 1) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 void update_projectiles() {
     Projectile *current = projectiles;
     Projectile *prev = NULL;
@@ -327,6 +384,38 @@ void render_projectiles(SDL_Renderer *renderer) {
     }
 }
 
+void render_enemies(SDL_Renderer *renderer) {
+    for (int i = 0; i < num_enemies; i++) {
+        if (is_line_of_sight_blocked((Vector2){player.x, player.y}, (Vector2){enemies[i].x, enemies[i].y})) {
+            continue;
+        }
+
+
+        float angle = atan2f(enemies[i].y - player.y, enemies[i].x - player.x);
+        if (angle < 0) {
+            angle += 2 * M_PI;
+        }
+        float distance_to_enemy = sqrtf(powf(enemies[i].x - player.x, 2) + powf(enemies[i].y - player.y, 2));
+        float relative_angle = player.direction - angle;
+
+        // Check if the enemy is in the player's field of view
+        if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
+            int line_height = (int)(WINDOW_HEIGHT / distance_to_enemy);
+
+            // Calculate the horizontal position of the enemy on the screen
+            int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
+
+            // Calculate the size of the enemy square, taking perspective into account
+            int square_size = (int)(line_height * 0.5);
+
+            // Set the color and render the enemy as a big brown square
+            SDL_SetRenderDrawColor(renderer, 139, 69, 19, 255); // Brown color
+            SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
+            SDL_RenderFillRect(renderer, &square);
+        }
+    }
+}
+
 void fire_projectile(void) {
     Projectile *new_projectile = (Projectile *)malloc(sizeof(Projectile));
     new_projectile->position = (Vector2){player.x, player.y};
@@ -367,7 +456,15 @@ void load_map(const char *filename) {
                 player.y = y + 0.5;
                 map[y][x] = 0;
                 player_start_found = true;
+            } else if (map[y][x] == 2) {
+                if (num_enemies < MAX_ENEMIES) {
+                    enemies[num_enemies].x = x + 0.5;
+                    enemies[num_enemies].y = y + 0.5;
+                    num_enemies++;
+                }
+                map[y][x] = 0;
             }
+
         }
     }
 
