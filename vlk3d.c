@@ -363,228 +363,228 @@ bool is_line_of_sight_blocked(Vector2 start, Vector2 end) {
 
         if (mapX >= 0 && mapX < map_width && mapY >= 0 && mapY < map_height && map[mapY][mapX] == 1) {
             return true;
+        }
+    }
+
+    return false;
 }
+
+bool has_no_enemies() {
+    for (int i = 0; i < num_enemies; i++) {
+        if (!enemies[i].harmless) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void update_projectiles() {
+    Projectile *current = projectiles;
+    Projectile *prev = NULL;
+
+    while (current != NULL) {
+        current->position.x += current->direction.x * PROJECTILE_SPEED;
+        current->position.y += current->direction.y * PROJECTILE_SPEED;
+
+        bool remove_projectile = false;
+
+        if (is_wall_collision(current->position.x, current->position.y)) {
+            remove_projectile = true;
         }
 
-        return false;
-    }
+        // Check for collisions with enemies
+        for (int j = 0; j < num_enemies; j++) {
+            float dx = enemies[j].x - current->position.x;
+            float dy = enemies[j].y - current->position.y;
+            float distance = sqrtf(dx * dx + dy * dy);
 
-    bool has_no_enemies() {
-        for (int i = 0; i < num_enemies; i++) {
-            if (!enemies[i].harmless) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    void update_projectiles() {
-        Projectile *current = projectiles;
-        Projectile *prev = NULL;
-
-        while (current != NULL) {
-            current->position.x += current->direction.x * PROJECTILE_SPEED;
-            current->position.y += current->direction.y * PROJECTILE_SPEED;
-
-            bool remove_projectile = false;
-
-            if (is_wall_collision(current->position.x, current->position.y)) {
+            if (distance < 0.5) { // Collision detected, adjust this value as needed
                 remove_projectile = true;
+                enemies[j].harmless = true; // Make the enemy harmless
             }
+        }
 
-            // Check for collisions with enemies
-            for (int j = 0; j < num_enemies; j++) {
-                float dx = enemies[j].x - current->position.x;
-                float dy = enemies[j].y - current->position.y;
-                float distance = sqrtf(dx * dx + dy * dy);
-
-                if (distance < 0.5) { // Collision detected, adjust this value as needed
-                    remove_projectile = true;
-                    enemies[j].harmless = true; // Make the enemy harmless
-                }
-            }
-
-            if (remove_projectile) {
-                if (prev) {
-                    prev->next = current->next;
-                } else {
-                    projectiles = current->next;
-                }
-
-                Projectile *to_remove = current;
-                current = current->next;
-                free(to_remove);
+        if (remove_projectile) {
+            if (prev) {
+                prev->next = current->next;
             } else {
-                prev = current;
-                current = current->next;
-            }
-        }
-    }
-
-    void render_projectiles(SDL_Renderer *renderer) {
-        Projectile *current = projectiles;
-
-        while (current != NULL) {
-            float angle = atan2f(current->position.y - player.y, current->position.x - player.x);
-            if (angle < 0) {
-                angle += 2 * M_PI;
-            }
-            float distance_to_projectile = sqrtf(powf(current->position.x - player.x, 2) + powf(current->position.y - player.y, 2));
-            float relative_angle = player.direction - angle;
-
-            // Check if the projectile is in the player's field of view
-            if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
-                int line_height = (int)(WINDOW_HEIGHT / distance_to_projectile);
-
-                // Calculate the horizontal position of the projectile on the screen
-                int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
-
-                // Calculate the size of the projectile square, taking perspective into account
-                int square_size = (int)(line_height * 0.2);
-
-                // Set the color and render the projectile as a square
-                SDL_SetRenderDrawColor(renderer, PROJECTILE_COLOR_R, PROJECTILE_COLOR_G, PROJECTILE_COLOR_B, 255);
-                SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
-                SDL_RenderFillRect(renderer, &square);
+                projectiles = current->next;
             }
 
-            current = current->next;
-        }
-    }
-
-    void render_enemies(SDL_Renderer *renderer) {
-        for (int i = 0; i < num_enemies; i++) {
-            if (is_line_of_sight_blocked((Vector2){player.x, player.y}, (Vector2){enemies[i].x, enemies[i].y})) {
-                continue;
-            }
-
-
-            float angle = atan2f(enemies[i].y - player.y, enemies[i].x - player.x);
-            if (angle < 0) {
-                angle += 2 * M_PI;
-            }
-            float distance_to_enemy = sqrtf(powf(enemies[i].x - player.x, 2) + powf(enemies[i].y - player.y, 2));
-            float relative_angle = player.direction - angle;
-
-            // Check if the enemy is in the player's field of view
-            if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
-                int line_height = (int)(WINDOW_HEIGHT / distance_to_enemy);
-
-                // Calculate the horizontal position of the enemy on the screen
-                int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
-
-                // Calculate the size of the enemy square, taking perspective into account
-                int square_size = (int)(line_height * 0.5);
-
-                // Set the color and render of dangerous enemy as a big brown
-                // square, harmless enemies are green
-                if (enemies[i].harmless) {
-                    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green
-                } else {
-                    SDL_SetRenderDrawColor(renderer, 139, 69, 19, 255); // Brown color
-                }
-                SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
-                SDL_RenderFillRect(renderer, &square);
-            }
-        }
-    }
-
-    void fire_projectile(void) {
-        Projectile *new_projectile = (Projectile *)malloc(sizeof(Projectile));
-        new_projectile->position = (Vector2){player.x, player.y};
-        new_projectile->direction = (Vector2){cosf(player.direction), sinf(player.direction)};
-        new_projectile->next = projectiles;
-
-        projectiles = new_projectile;
-    }
-
-    void free_projectiles() {
-        Projectile *current = projectiles;
-
-        while (current != NULL) {
             Projectile *to_remove = current;
             current = current->next;
             free(to_remove);
+        } else {
+            prev = current;
+            current = current->next;
         }
     }
+}
 
-    void load_map(const char *filename) {
-        FILE *file = fopen(filename, "r");
-        if (file == NULL) {
-            fprintf(stderr, "Error opening map file: %s\n", filename);
-            exit(1);
+void render_projectiles(SDL_Renderer *renderer) {
+    Projectile *current = projectiles;
+
+    while (current != NULL) {
+        float angle = atan2f(current->position.y - player.y, current->position.x - player.x);
+        if (angle < 0) {
+            angle += 2 * M_PI;
+        }
+        float distance_to_projectile = sqrtf(powf(current->position.x - player.x, 2) + powf(current->position.y - player.y, 2));
+        float relative_angle = player.direction - angle;
+
+        // Check if the projectile is in the player's field of view
+        if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
+            int line_height = (int)(WINDOW_HEIGHT / distance_to_projectile);
+
+            // Calculate the horizontal position of the projectile on the screen
+            int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
+
+            // Calculate the size of the projectile square, taking perspective into account
+            int square_size = (int)(line_height * 0.2);
+
+            // Set the color and render the projectile as a square
+            SDL_SetRenderDrawColor(renderer, PROJECTILE_COLOR_R, PROJECTILE_COLOR_G, PROJECTILE_COLOR_B, 255);
+            SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
+            SDL_RenderFillRect(renderer, &square);
         }
 
-        fscanf(file, "%d %d", &map_width, &map_height);
+        current = current->next;
+    }
+}
 
-        map = (int **)malloc(map_height * sizeof(int *));
-        bool player_start_found = false;
-        for (int y = 0; y < map_height; y++) {
-            map[y] = (int *)malloc(map_width * sizeof(int));
-            for (int x = 0; x < map_width; x++) {
-                fscanf(file, "%1d", &map[y][x]);
+void render_enemies(SDL_Renderer *renderer) {
+    for (int i = 0; i < num_enemies; i++) {
+        if (is_line_of_sight_blocked((Vector2){player.x, player.y}, (Vector2){enemies[i].x, enemies[i].y})) {
+            continue;
+        }
 
-                if (map[y][x] == 9) {
-                    player.x = x + 0.5;
-                    player.y = y + 0.5;
-                    map[y][x] = 0;
-                    player_start_found = true;
-                } else if (map[y][x] == 2) {
-                    if (num_enemies < MAX_ENEMIES) {
-                        enemies[num_enemies].x = x + 0.5;
-                        enemies[num_enemies].y = y + 0.5;
-                        enemies[num_enemies].harmless = false;
-                        num_enemies++;
-                    }
-                    map[y][x] = 0;
-                }
 
+        float angle = atan2f(enemies[i].y - player.y, enemies[i].x - player.x);
+        if (angle < 0) {
+            angle += 2 * M_PI;
+        }
+        float distance_to_enemy = sqrtf(powf(enemies[i].x - player.x, 2) + powf(enemies[i].y - player.y, 2));
+        float relative_angle = player.direction - angle;
+
+        // Check if the enemy is in the player's field of view
+        if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
+            int line_height = (int)(WINDOW_HEIGHT / distance_to_enemy);
+
+            // Calculate the horizontal position of the enemy on the screen
+            int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
+
+            // Calculate the size of the enemy square, taking perspective into account
+            int square_size = (int)(line_height * 0.5);
+
+            // Set the color and render of dangerous enemy as a big brown
+            // square, harmless enemies are green
+            if (enemies[i].harmless) {
+                SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green
+            } else {
+                SDL_SetRenderDrawColor(renderer, 139, 69, 19, 255); // Brown color
             }
+            SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
+            SDL_RenderFillRect(renderer, &square);
         }
+    }
+}
 
-        if (!player_start_found) {
-            fprintf(stderr, "No starting position found in the map file: %s\n", filename);
-            exit(1);
-        }
+void fire_projectile(void) {
+    Projectile *new_projectile = (Projectile *)malloc(sizeof(Projectile));
+    new_projectile->position = (Vector2){player.x, player.y};
+    new_projectile->direction = (Vector2){cosf(player.direction), sinf(player.direction)};
+    new_projectile->next = projectiles;
 
-        fclose(file);
+    projectiles = new_projectile;
+}
+
+void free_projectiles() {
+    Projectile *current = projectiles;
+
+    while (current != NULL) {
+        Projectile *to_remove = current;
+        current = current->next;
+        free(to_remove);
+    }
+}
+
+void load_map(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening map file: %s\n", filename);
+        exit(1);
     }
 
-    void free_map() {
-        for (int y = 0; y < map_height; y++) {
-            free(map[y]);
+    fscanf(file, "%d %d", &map_width, &map_height);
+
+    map = (int **)malloc(map_height * sizeof(int *));
+    bool player_start_found = false;
+    for (int y = 0; y < map_height; y++) {
+        map[y] = (int *)malloc(map_width * sizeof(int));
+        for (int x = 0; x < map_width; x++) {
+            fscanf(file, "%1d", &map[y][x]);
+
+            if (map[y][x] == 9) {
+                player.x = x + 0.5;
+                player.y = y + 0.5;
+                map[y][x] = 0;
+                player_start_found = true;
+            } else if (map[y][x] == 2) {
+                if (num_enemies < MAX_ENEMIES) {
+                    enemies[num_enemies].x = x + 0.5;
+                    enemies[num_enemies].y = y + 0.5;
+                    enemies[num_enemies].harmless = false;
+                    num_enemies++;
+                }
+                map[y][x] = 0;
+            }
+
         }
-        free(map);
     }
 
-    void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y) {
-        SDL_Surface *text_surface = TTF_RenderText_Blended(font, message, color);
-        SDL_Surface *outline_surface = TTF_RenderText_Blended(font, message, outline_color);
-
-        SDL_Rect offset;
-        offset.x = -1;
-        offset.y = -1;
-        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-        offset.x = 1;
-        offset.y = -1;
-        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-        offset.x = -1;
-        offset.y = 1;
-        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-        offset.x = 1;
-        offset.y = 1;
-        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-
-        SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-
-        SDL_Rect dest;
-        dest.x = x;
-        dest.y = y;
-        dest.w = text_surface->w;
-        dest.h = text_surface->h;
-
-        SDL_RenderCopy(renderer, text_texture, NULL, &dest);
-        SDL_FreeSurface(text_surface);
-        SDL_FreeSurface(outline_surface);
-        SDL_DestroyTexture(text_texture);
+    if (!player_start_found) {
+        fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+        exit(1);
     }
+
+    fclose(file);
+}
+
+void free_map() {
+    for (int y = 0; y < map_height; y++) {
+        free(map[y]);
+    }
+    free(map);
+}
+
+void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y) {
+    SDL_Surface *text_surface = TTF_RenderText_Blended(font, message, color);
+    SDL_Surface *outline_surface = TTF_RenderText_Blended(font, message, outline_color);
+
+    SDL_Rect offset;
+    offset.x = -1;
+    offset.y = -1;
+    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+    offset.x = 1;
+    offset.y = -1;
+    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+    offset.x = -1;
+    offset.y = 1;
+    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+    offset.x = 1;
+    offset.y = 1;
+    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+
+    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+
+    SDL_Rect dest;
+    dest.x = x;
+    dest.y = y;
+    dest.w = text_surface->w;
+    dest.h = text_surface->h;
+
+    SDL_RenderCopy(renderer, text_texture, NULL, &dest);
+    SDL_FreeSurface(text_surface);
+    SDL_FreeSurface(outline_surface);
+    SDL_DestroyTexture(text_texture);
+}
