@@ -423,8 +423,13 @@ void render_enemies(SDL_Renderer *renderer) {
             // Calculate the size of the enemy square, taking perspective into account
             int square_size = (int)(line_height * 0.5);
 
-            // Set the color and render the enemy as a big brown square
-            SDL_SetRenderDrawColor(renderer, 139, 69, 19, 255); // Brown color
+            // Set the color and render of dangerous enemy as a big brown
+            // square, harmless enemies are green
+            if (enemies[i].harmless) {
+                SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green
+            } else {
+                SDL_SetRenderDrawColor(renderer, 139, 69, 19, 255); // Brown color
+            }
             SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
             SDL_RenderFillRect(renderer, &square);
         }
