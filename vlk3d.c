@@ -62,7 +62,7 @@ SDL_Texture *wall_texture = NULL;
 
 int **map;
 
-Player player = {2.0, 2.0, 0.0};
+Player player = {0, 0, 0}; // Starting position will be set by the load_map function
 
 /* Function prototypes */
 
@@ -356,11 +356,24 @@ void load_map(const char *filename) {
     fscanf(file, "%d %d", &map_width, &map_height);
 
     map = (int **)malloc(map_height * sizeof(int *));
+    bool player_start_found = false;
     for (int y = 0; y < map_height; y++) {
         map[y] = (int *)malloc(map_width * sizeof(int));
         for (int x = 0; x < map_width; x++) {
             fscanf(file, "%1d", &map[y][x]);
+
+            if (map[y][x] == 9) {
+                player.x = x + 0.5;
+                player.y = y + 0.5;
+                map[y][x] = 0;
+                player_start_found = true;
+            }
         }
+    }
+
+    if (!player_start_found) {
+        fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+        exit(1);
     }
 
     fclose(file);
