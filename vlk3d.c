@@ -292,7 +292,7 @@ bool is_wall_collision(float x, float y) {
 bool is_close_to_enemy(float x, float y) {
     for (int i = 0; i < num_enemies; i++) {
         float distance = sqrtf(powf(x - enemies[i].x, 2) + powf(y - enemies[i].y, 2));
-        if (distance < ENEMY_PROXIMITY_DISTANCE) {
+        if (distance < ENEMY_PROXIMITY_DISTANCE && !enemies[i].harmless) {
             return true;
         }
     }
