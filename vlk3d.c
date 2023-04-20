@@ -65,8 +65,8 @@ Player player = {0, 0, 0};
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
 typedef struct {
-    float x;
-    float y;
+    float x, y;
+    bool harmless;
 } Enemy;
 
 #define MAX_ENEMIES 50
@@ -333,7 +333,25 @@ void update_projectiles() {
         current->position.x += current->direction.x * PROJECTILE_SPEED;
         current->position.y += current->direction.y * PROJECTILE_SPEED;
 
+        bool remove_projectile = false;
+
         if (is_wall_collision(current->position.x, current->position.y)) {
+            remove_projectile = true;
+        }
+
+        // Check for collisions with enemies
+        for (int j = 0; j < num_enemies; j++) {
+            float dx = enemies[j].x - current->position.x;
+            float dy = enemies[j].y - current->position.y;
+            float distance = sqrtf(dx * dx + dy * dy);
+
+            if (distance < 0.5) { // Collision detected, adjust this value as needed
+                remove_projectile = true;
+                enemies[j].harmless = true; // Make the enemy harmless
+            }
+        }
+
+        if (remove_projectile) {
             if (prev) {
                 prev->next = current->next;
             } else {
@@ -457,6 +475,7 @@ void load_map(const char *filename) {
                 if (num_enemies < MAX_ENEMIES) {
                     enemies[num_enemies].x = x + 0.5;
                     enemies[num_enemies].y = y + 0.5;
+                    enemies[num_enemies].harmless = false;
                     num_enemies++;
                 }
                 map[y][x] = 0;
