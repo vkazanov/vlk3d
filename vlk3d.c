@@ -187,6 +187,13 @@ void handle_events(SDL_Event *event, bool *is_running) {
         } else if (event->key.keysym.sym == SDLK_RIGHT) {
             player.direction += PLAYER_ROTATION_SPEED;
         }
+
+        // Wrap player.direction within the range [0, 2 * M_PI]
+        player.direction = fmod(player.direction, 2 * M_PI);
+        if (player.direction < 0) {
+            player.direction += 2 * M_PI;
+        }
+
         break;
         /* Handle other event types here */
     default:
@@ -292,6 +299,9 @@ void render_projectiles(SDL_Renderer *renderer) {
 
     while (current != NULL) {
         float angle = atan2f(current->position.y - player.y, current->position.x - player.x);
+        if (angle < 0) {
+            angle += 2 * M_PI;
+        }
         float distance_to_projectile = sqrtf(powf(current->position.x - player.x, 2) + powf(current->position.y - player.y, 2));
         float relative_angle = player.direction - angle;
 
