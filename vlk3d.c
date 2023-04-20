@@ -21,8 +21,8 @@
 #define RAY_COUNT (WINDOW_WIDTH)
 #define MAX_DISTANCE 20.0
 
-#define MAP_WIDTH 6
-#define MAP_HEIGHT 6
+#define MAP_WIDTH 12
+#define MAP_HEIGHT 12
 
 /* Types/typedefs */
 
@@ -60,14 +60,7 @@ SDL_Texture *wall_texture = NULL;
 
 /* Game state */
 
-int map[MAP_HEIGHT][MAP_WIDTH] = {
-    {1, 1, 1, 1, 1, 1},
-    {1, 1, 0, 0, 0, 1},
-    {1, 0, 0, 0, 0, 1},
-    {1, 0, 0, 0, 0, 1},
-    {1, 0, 0, 0, 1, 1},
-    {1, 1, 1, 1, 1, 1}
-};
+int map[MAP_HEIGHT][MAP_WIDTH];
 
 Player player = {2.0, 2.0, 0.0};
 
@@ -83,6 +76,8 @@ void update_projectiles();
 void render_projectiles(SDL_Renderer *renderer);
 void fire_projectile();
 void free_projectiles();
+
+void load_map(const char *filename);
 
 int main(int argc, char *argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -131,6 +126,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    load_map("map.txt");
     game_loop(window, renderer);
 
     free_projectiles();
@@ -336,4 +332,22 @@ void free_projectiles() {
         current = current->next;
         free(to_remove);
     }
+}
+
+void load_map(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening map file: %s\n", filename);
+        exit(1);
+    }
+
+    for (int i = 0; i < MAP_HEIGHT; i++) {
+        for (int j = 0; j < MAP_WIDTH; j++) {
+            int value;
+            fscanf(file, "%d", &value);
+            map[i][j] = value;
+        }
+    }
+
+    fclose(file);
 }
