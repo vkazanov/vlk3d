@@ -262,19 +262,17 @@ void render_projectiles(SDL_Renderer *renderer) {
 
         // Check if the projectile is in the player's field of view
         if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
-            float distance_to_wall = cast_ray(&player, angle);
-            int lineHeight = (int)(WINDOW_HEIGHT / distance_to_projectile);
-            int screenWidth = (int)(WINDOW_WIDTH / (float)RAY_COUNT);
+            int line_height = (int)(WINDOW_HEIGHT / distance_to_projectile);
 
             // Calculate the horizontal position of the projectile on the screen
-            int screenX = (int)((WINDOW_WIDTH / 2) + tanf(relative_angle) * distance_to_projectile * screenWidth);
+            int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
 
             // Calculate the size of the projectile square, taking perspective into account
-            int squareSize = (int)(lineHeight * 0.2);
+            int square_size = (int)(line_height * 0.2);
 
             // Set the color and render the projectile as a square
             SDL_SetRenderDrawColor(renderer, PROJECTILE_COLOR_R, PROJECTILE_COLOR_G, PROJECTILE_COLOR_B, 255);
-            SDL_Rect square = {screenX - squareSize / 2, (WINDOW_HEIGHT - lineHeight) / 2 + (lineHeight - squareSize) / 2, squareSize, squareSize};
+            SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
             SDL_RenderFillRect(renderer, &square);
         }
 
