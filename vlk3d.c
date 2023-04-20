@@ -7,7 +7,7 @@
 /* The simplest game skeleton.
 
    Compile with something like:
-   gcc -o game game.c (sdl2-config --cflags --libs) -lm; and ./game
+   gcc -o vlk3d vlk3d.c (sdl2-config --cflags --libs) -lm; and ./vlk3d
 */
 
 
@@ -179,10 +179,11 @@ void render(SDL_Renderer *renderer, Player *player) {
 
     for (int i = 0; i < RAY_COUNT; i++) {
         float angle = player->direction - FOV / 2.0 + FOV * i / (float)RAY_COUNT;
-        float distance = cast_ray(player, angle);
-        int lineHeight = (int)(WINDOW_HEIGHT / distance);
+        float raw_distance = cast_ray(player, angle);
+        float corrected_distance = raw_distance * cosf(player->direction - angle); // Correct the fishbowl effect
+        int lineHeight = (int)(WINDOW_HEIGHT / corrected_distance);
 
-        int color = (int)(255 * (1 - distance / MAX_DISTANCE));
+        int color = (int)(255 * (1 - corrected_distance / MAX_DISTANCE));
         color = color > 255 ? 255 : (color < 0 ? 0 : color);
 
         SDL_SetRenderDrawColor(renderer, color, color, color, 255);
