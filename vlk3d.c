@@ -15,11 +15,12 @@
 
 /* Constants */
 
-#define WINDOW_WIDTH 1024
-#define WINDOW_HEIGHT 768
+#define WINDOW_WIDTH 1366.0
+#define WINDOW_HEIGHT 768.0
 
-#define FOV M_PI / 3.0
+#define FOV (M_PI / 3.0)
 #define RAY_COUNT (WINDOW_WIDTH)
+#define RAY_STEP 0.01
 #define MAX_DISTANCE 20.0
 
 /* Types/typedefs */
@@ -271,35 +272,40 @@ void render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
+    float ray_per_column = (WINDOW_WIDTH / RAY_COUNT);
+    float angle_per_ray = (FOV / (float)RAY_COUNT);
+
     for (int i = 0; i < RAY_COUNT; i++) {
-        float angle = player.direction - FOV / 2.0 + FOV * i / (float)RAY_COUNT;
-        float raw_distance = cast_ray(angle);
-        float corrected_distance = raw_distance * cosf(player.direction - angle); // Correct the fishbowl effect
-        float line_height = WINDOW_HEIGHT / corrected_distance;
+        float ray_angle = player.direction - FOV / 2.0 + i * angle_per_ray;
+        float raw_distance = cast_ray(ray_angle);
+        /* Correct the fisheye effect */
+        float corrected_distance = raw_distance * cosf(player.direction - ray_angle);
+        int line_height = (int)(WINDOW_HEIGHT / corrected_distance);
 
-        // Calculate the direction vector
-        Vector2 direction = {cosf(angle), sinf(angle)};
+        /* Calculate the direction vector */
+        Vector2 direction = {cosf(ray_angle), sinf(ray_angle)};
 
-        // Calculate the texture coordinate
+        /* Calculate the texture coordinate */
         Vector2 hit_position = {player.x + direction.x * corrected_distance, player.y + direction.y * corrected_distance};
         float tex_x;
         if (fabs(direction.x) > fabs(direction.y)) {
-            tex_x = fmod(hit_position.y, 1);
+            tex_x = hit_position.y - floor(hit_position.y);
+            if (ray_angle > M_PI && ray_angle < 3 * M_PI_2) tex_x = 1 - tex_x;
         } else {
-            tex_x = fmod(hit_position.x, 1);
+            tex_x = hit_position.x - floor(hit_position.x);
+            if (ray_angle > 0 && ray_angle < M_PI) tex_x = 1 - tex_x;
         }
-        if (tex_x < 0) tex_x += 1;
 
-        // Set the source rectangle for the texture
+        /* Set the source rectangle for the texture */
         int texture_w, texture_h;
         SDL_QueryTexture(wall_texture, NULL, NULL, &texture_w, &texture_h);
-        SDL_Rect src_rect = {(int)(tex_x * texture_w), 0, 1, texture_h};
+        SDL_Rect src_rect = {(int)(tex_x * (float)texture_w) % texture_w, 0, 1, texture_h};
 
-        // Set the destination rectangle for the texture
-        SDL_FRect dest_rect = {i * (WINDOW_WIDTH / (float)RAY_COUNT), (WINDOW_HEIGHT - line_height) / 2, (WINDOW_WIDTH / (float)RAY_COUNT), line_height};
+        /* Set the destination rectangle for the texture */
+        SDL_Rect dest_rect = {i * ray_per_column, (WINDOW_HEIGHT - line_height) / 2, ray_per_column, line_height};
 
-        // Render the textured wall
-        SDL_RenderCopyF(renderer, wall_texture, &src_rect, &dest_rect);
+        /* Render the textured wall */
+        SDL_RenderCopy(renderer, wall_texture, &src_rect, &dest_rect);
     }
 }
 
@@ -309,16 +315,17 @@ float cast_ray(float angle) {
     Vector2 position = {player.x, player.y};
 
     while (distance < MAX_DISTANCE) {
-        position.x += direction.x * 0.1;
-        position.y += direction.y * 0.1;
-        distance += 0.1;
+        position.x += direction.x * RAY_STEP;
+        position.y += direction.y * RAY_STEP;
 
-        int mapX = (int)floor(position.x);
-        int mapY = (int)floor(position.y);
+        int map_x = (int)floor(position.x);
+        int map_y = (int)floor(position.y);
 
-        if (mapX >= 0 && mapX < map_width && mapY >= 0 && mapY < map_height && map[mapY][mapX] == 1) {
+        if (map_x >= 0 && map_x < map_width && map_y >= 0 && map_y < map_height && map[map_y][map_x] == 1) {
             break;
         }
+
+        distance += RAY_STEP;
     }
 
     return distance;
