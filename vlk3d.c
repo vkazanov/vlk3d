@@ -275,7 +275,7 @@ void render(SDL_Renderer *renderer) {
         float angle = player.direction - FOV / 2.0 + FOV * i / (float)RAY_COUNT;
         float raw_distance = cast_ray(angle);
         float corrected_distance = raw_distance * cosf(player.direction - angle); // Correct the fishbowl effect
-        int line_height = (int)(WINDOW_HEIGHT / corrected_distance);
+        float line_height = WINDOW_HEIGHT / corrected_distance;
 
         // Calculate the direction vector
         Vector2 direction = {cosf(angle), sinf(angle)};
@@ -296,10 +296,10 @@ void render(SDL_Renderer *renderer) {
         SDL_Rect src_rect = {(int)(tex_x * texture_w), 0, 1, texture_h};
 
         // Set the destination rectangle for the texture
-        SDL_Rect dest_rect = {i * (WINDOW_WIDTH / RAY_COUNT), (WINDOW_HEIGHT - line_height) / 2, (WINDOW_WIDTH / RAY_COUNT), line_height};
+        SDL_FRect dest_rect = {i * (WINDOW_WIDTH / (float)RAY_COUNT), (WINDOW_HEIGHT - line_height) / 2, (WINDOW_WIDTH / (float)RAY_COUNT), line_height};
 
         // Render the textured wall
-        SDL_RenderCopy(renderer, wall_texture, &src_rect, &dest_rect);
+        SDL_RenderCopyF(renderer, wall_texture, &src_rect, &dest_rect);
     }
 }
 
