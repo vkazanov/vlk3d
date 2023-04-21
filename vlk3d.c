@@ -100,6 +100,7 @@ void free_projectiles();
 void free_map();
 void load_map(const char *filename);
 void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y);
+void wait_for_key_press();
 
 int main(int argc, char *argv[]) {
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
@@ -168,18 +169,18 @@ int main(int argc, char *argv[]) {
     SDL_Color black = {0, 0, 0, 255}; // New outline color
     switch (game_loop(window, renderer)) {
     case GAME_RESULT_WIN:
-        render_text(renderer, "You win!", font, white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24); // Adjust the position and add the outline color
+        render_text(renderer, "You win!", font, white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24);
         SDL_RenderPresent(renderer);
-        SDL_Delay(2000);
+        wait_for_key_press();
         break;
     case GAME_RESULT_DIE:
-        render_text(renderer, "You lose!", font, white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24); // Adjust the position and add the outline color
+        render_text(renderer, "You lose!", font, white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24);
         SDL_RenderPresent(renderer);
-        SDL_Delay(2000);
+        wait_for_key_press();
         break;
     case GAME_RESULT_ABORT:
         fprintf(stderr, "Aborted");
-        return 1;
+        break;
     }
 
     free_projectiles();
@@ -280,7 +281,7 @@ void render(SDL_Renderer *renderer) {
         Vector2 direction = {cosf(angle), sinf(angle)};
 
         // Calculate the texture coordinate
-        Vector2 hit_position = {player.x + direction.x * raw_distance, player.y + direction.y * raw_distance};
+        Vector2 hit_position = {player.x + direction.x * corrected_distance, player.y + direction.y * corrected_distance};
         float tex_x;
         if (fabs(direction.x) > fabs(direction.y)) {
             tex_x = fmod(hit_position.y, 1);
@@ -587,4 +588,23 @@ void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SD
     SDL_FreeSurface(text_surface);
     SDL_FreeSurface(outline_surface);
     SDL_DestroyTexture(text_texture);
+}
+
+
+void wait_for_key_press() {
+    SDL_Event event;
+    bool is_running = true;
+    while (is_running) {
+        SDL_PollEvent(&event);
+        switch (event.type) {
+        case SDL_QUIT:
+            is_running = false;
+            break;
+        case SDL_KEYDOWN:
+            is_running = false;
+            break;
+        default:
+            break;
+        }
+    }
 }
