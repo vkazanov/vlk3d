@@ -1,0 +1,23 @@
+Nika's ideas:
+
+- [ ] colorful win/lose letters
+
+- [ ] fireworks when winning
+
+- [ ] different kinds of monsters: moving, hiding, shooting
+
+- [ ] room doors
+
+- [ ] coins
+
+- [ ] timer for a level
+
+My ideas:
+
+- [ ] loading a map from cli args
+
+- [ ] fix texture mapping
+
+- [ ] monsters overlapping
+
+- [ ] monsters bouding box (visible part should)
