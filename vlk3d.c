@@ -146,7 +146,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Surface *wall_surface = IMG_Load("wall.bmp");
+    SDL_Surface *wall_surface = IMG_Load("wallpaper.bmp");
     if (wall_surface == NULL) {
         fprintf(stderr, "Failed to load wall texture: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
