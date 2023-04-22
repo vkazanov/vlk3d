@@ -19,7 +19,7 @@
 #define WINDOW_HEIGHT 768.0
 
 #define FOV (M_PI / 3.0)
-#define RAY_COUNT (WINDOW_WIDTH)
+#define RAY_COUNT (WINDOW_WIDTH / 4)
 #define RAY_STEP 0.01
 #define MAX_DISTANCE 20.0
 
@@ -272,7 +272,9 @@ void render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
-    float ray_per_column = (WINDOW_WIDTH / RAY_COUNT);
+    int texture_w, texture_h;
+    SDL_QueryTexture(wall_texture, NULL, NULL, &texture_w, &texture_h);
+    float rays_per_column = (WINDOW_WIDTH / RAY_COUNT);
     float angle_per_ray = (FOV / (float)RAY_COUNT);
 
     for (int i = 0; i < RAY_COUNT; i++) {
@@ -285,24 +287,22 @@ void render(SDL_Renderer *renderer) {
         /* Calculate the direction vector */
         Vector2 direction = {cosf(ray_angle), sinf(ray_angle)};
 
-        /* Calculate the texture coordinate */
-        Vector2 hit_position = {player.x + direction.x * corrected_distance, player.y + direction.y * corrected_distance};
+        /* Calculate the coordinate within a texture (0.0 ... 1.0) */
+        Vector2 hit_position = {player.x + direction.x * raw_distance, player.y + direction.y * raw_distance};
         float tex_x;
         if (fabs(direction.x) > fabs(direction.y)) {
             tex_x = hit_position.y - floor(hit_position.y);
-            if (ray_angle > M_PI && ray_angle < 3 * M_PI_2) tex_x = 1 - tex_x;
         } else {
             tex_x = hit_position.x - floor(hit_position.x);
-            if (ray_angle > 0 && ray_angle < M_PI) tex_x = 1 - tex_x;
         }
 
         /* Set the source rectangle for the texture */
-        int texture_w, texture_h;
-        SDL_QueryTexture(wall_texture, NULL, NULL, &texture_w, &texture_h);
-        SDL_Rect src_rect = {(int)(tex_x * (float)texture_w) % texture_w, 0, 1, texture_h};
+        int tex_rect_x = (int)(tex_x * (float)texture_w);
+        int tex_rect_y = 0;
+        SDL_Rect src_rect = {tex_rect_x, tex_rect_y, 1, texture_h};
 
         /* Set the destination rectangle for the texture */
-        SDL_Rect dest_rect = {i * ray_per_column, (WINDOW_HEIGHT - line_height) / 2, ray_per_column, line_height};
+        SDL_Rect dest_rect = {i * rays_per_column, (WINDOW_HEIGHT - line_height) / 2, rays_per_column, line_height};
 
         /* Render the textured wall */
         SDL_RenderCopy(renderer, wall_texture, &src_rect, &dest_rect);
