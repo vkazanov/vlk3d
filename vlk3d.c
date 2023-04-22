@@ -33,7 +33,7 @@ typedef struct {
 typedef struct {
     float x;
     float y;
-    float direction;
+    float direction;            /* degrees */
 } Player;
 
 typedef enum {
@@ -89,6 +89,7 @@ void handle_events(SDL_Event *event, bool *is_running);
 void render(SDL_Renderer *renderer);
 float cast_ray(float angle);
 bool is_wall_collision(float x, float y);
+bool is_horizontal_wall(Vector2 position);
 bool is_close_to_enemy(float x, float y);
 bool is_line_of_sight_blocked(Vector2 start, Vector2 end);
 bool has_no_enemies();
@@ -280,7 +281,8 @@ void render(SDL_Renderer *renderer) {
     for (int i = 0; i < RAY_COUNT; i++) {
         float ray_angle = player.direction - FOV / 2.0 + i * angle_per_ray;
         float raw_distance = cast_ray(ray_angle);
-        /* Correct the fisheye effect */
+
+        /* Calculate the line height while correcting for the fisheye effect */
         float corrected_distance = raw_distance * cosf(player.direction - ray_angle);
         int line_height = (int)(WINDOW_HEIGHT / corrected_distance);
 
@@ -289,11 +291,13 @@ void render(SDL_Renderer *renderer) {
 
         /* Calculate the coordinate within a texture (0.0 ... 1.0) */
         Vector2 hit_position = {player.x + direction.x * raw_distance, player.y + direction.y * raw_distance};
-        float tex_x;
-        if (fabs(direction.x) > fabs(direction.y)) {
-            tex_x = hit_position.y - floor(hit_position.y);
-        } else {
+        float tex_x;            /* texture coordinate */
+        if (is_horizontal_wall(hit_position)) {
+            /* A horizontal wall */
             tex_x = hit_position.x - floor(hit_position.x);
+        } else {
+            /* A vertical wall */
+            tex_x = hit_position.y - floor(hit_position.y);
         }
 
         /* Set the source rectangle for the texture */
@@ -340,6 +344,12 @@ bool is_wall_collision(float x, float y) {
     }
 
     return false;
+}
+
+bool is_horizontal_wall(Vector2 position) {
+    /* Just check coordinates to see if the point is on a horizontal or a
+     * vertical grid line */
+    return fabs(round(position.x) - position.x) >= fabs(round(position.y) - position.y);
 }
 
 bool is_close_to_enemy(float x, float y) {
