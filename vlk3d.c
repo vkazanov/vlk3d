@@ -273,6 +273,17 @@ void render(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
+    /* Draw the ceiling (white) */
+    SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+    SDL_Rect ceiling_rect = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT / 2};
+    SDL_RenderFillRect(renderer, &ceiling_rect);
+
+    /* Draw the floor (grey) */
+    SDL_SetRenderDrawColor(renderer, 128, 128, 128, 255);
+    SDL_Rect floor_rect = {0, WINDOW_HEIGHT / 2, WINDOW_WIDTH, WINDOW_HEIGHT / 2};
+    SDL_RenderFillRect(renderer, &floor_rect);
+
+    /* Draw walls using texture mapping */
     int texture_w, texture_h;
     SDL_QueryTexture(wall_texture, NULL, NULL, &texture_w, &texture_h);
     float rays_per_column = (WINDOW_WIDTH / RAY_COUNT);
