@@ -18,6 +18,8 @@ My ideas:
 
 - [ ] fix texture mapping
 
-- [ ] monsters overlapping
+- [ ] monsters overlapping (z-buffering? check how it's done in wolf3d)
+
+- [ ] double buffering for cleaner animated feeling
 
 - [ ] monsters bouding box (visible part should)

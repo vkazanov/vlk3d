@@ -110,8 +110,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) {
+        printf("Failed to initialize SDL_image: %s\n", IMG_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
     if (TTF_Init() < 0) {
         fprintf(stderr, "TTF could not initialize: %s\n", TTF_GetError());
+        IMG_Quit();
         SDL_Quit();
         return 1;
     }
@@ -146,7 +153,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Surface *wall_surface = IMG_Load("wallpaper.bmp");
+    SDL_Surface *wall_surface = IMG_Load("wallpaper.png");
     if (wall_surface == NULL) {
         fprintf(stderr, "Failed to load wall texture: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
@@ -193,6 +200,7 @@ int main(int argc, char *argv[]) {
     SDL_DestroyWindow(window);
     TTF_CloseFont(font);
     TTF_Quit();
+    IMG_Quit();  // Call this when you're done with SDL_image
 
     SDL_Quit();
 
