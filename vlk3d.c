@@ -15,11 +15,11 @@
 
 /* Constants */
 
-#define WINDOW_WIDTH 1366.0
-#define WINDOW_HEIGHT 768.0
+#define WINDOW_WIDTH 1366
+#define WINDOW_HEIGHT 768
 
 #define FOV (M_PI / 3.0)
-#define RAY_COUNT (WINDOW_WIDTH / 4)
+#define RAY_COUNT WINDOW_WIDTH
 #define RAY_STEP 0.01
 #define MAX_DISTANCE 20.0
 
@@ -43,7 +43,7 @@ typedef enum {
 } game_result_t;
 
 
-#define PLAYER_ROTATION_SPEED 0.1
+#define PLAYER_ROTATION_SPEED 0.05
 #define PLAYER_MOVEMENT_SPEED 0.1
 
 typedef struct Projectile {
@@ -57,8 +57,11 @@ typedef struct Projectile {
 #define PROJECTILE_COLOR_G 0
 #define PROJECTILE_COLOR_B 0
 
+int line_height_buffer[RAY_COUNT] = {0};
 
 SDL_Texture *wall_texture = NULL;
+SDL_Texture *fly_texture = NULL;
+SDL_Texture *poo_texture = NULL;
 
 /* Game state */
 
@@ -132,7 +135,7 @@ int main(int argc, char *argv[]) {
     }
 
 
-    SDL_Window *window = SDL_CreateWindow("Wolf3D-like Game",
+    SDL_Window *window = SDL_CreateWindow("Nika's Room",
                                           SDL_WINDOWPOS_UNDEFINED,
                                           SDL_WINDOWPOS_UNDEFINED,
                                           WINDOW_WIDTH,
@@ -154,18 +157,25 @@ int main(int argc, char *argv[]) {
     }
 
     SDL_Surface *wall_surface = IMG_Load("wallpaper.png");
-    if (wall_surface == NULL) {
-        fprintf(stderr, "Failed to load wall texture: %s\n", IMG_GetError());
+    SDL_Surface *fly_surface = IMG_Load("fly.png");
+    SDL_Surface *poo_surface = IMG_Load("poo.png");
+    if (wall_surface == NULL || fly_surface == NULL || poo_surface == NULL) {
+        fprintf(stderr, "Failed to load a texture: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
     }
     wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
-    SDL_FreeSurface(wall_surface);
+    fly_texture = SDL_CreateTextureFromSurface(renderer, fly_surface);
+    poo_texture = SDL_CreateTextureFromSurface(renderer, poo_surface);
 
-    if (wall_texture == NULL) {
-        fprintf(stderr, "Failed to create wall texture: %s\n", SDL_GetError());
+    SDL_FreeSurface(wall_surface);
+    SDL_FreeSurface(fly_surface);
+    SDL_FreeSurface(poo_surface);
+
+    if (wall_texture == NULL || fly_texture == NULL || poo_texture == NULL) {
+        fprintf(stderr, "Failed to create a texture: %s\n", SDL_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
         SDL_Quit();
@@ -196,6 +206,8 @@ int main(int argc, char *argv[]) {
     free_map();
 
     SDL_DestroyTexture(wall_texture);
+    SDL_DestroyTexture(poo_texture);
+    SDL_DestroyTexture(fly_texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     TTF_CloseFont(font);
@@ -294,8 +306,8 @@ void render(SDL_Renderer *renderer) {
     /* Draw walls using texture mapping */
     int texture_w, texture_h;
     SDL_QueryTexture(wall_texture, NULL, NULL, &texture_w, &texture_h);
-    float rays_per_column = (WINDOW_WIDTH / RAY_COUNT);
-    float angle_per_ray = (FOV / (float)RAY_COUNT);
+    const float rays_per_column = (WINDOW_WIDTH / RAY_COUNT);
+    const float angle_per_ray = (FOV / (float)RAY_COUNT);
 
     for (int i = 0; i < RAY_COUNT; i++) {
         float ray_angle = player.direction - FOV / 2.0 + i * angle_per_ray;
@@ -304,6 +316,9 @@ void render(SDL_Renderer *renderer) {
         /* Calculate the line height while correcting for the fisheye effect */
         float corrected_distance = raw_distance * cosf(player.direction - ray_angle);
         int line_height = (int)(WINDOW_HEIGHT / corrected_distance);
+
+        /* Save line height in a depth buffer to use in in sprite rendering */
+        line_height_buffer[i] = line_height;
 
         /* Calculate the direction vector */
         Vector2 direction = {cosf(ray_angle), sinf(ray_angle)};
@@ -489,39 +504,59 @@ void render_projectiles(SDL_Renderer *renderer) {
     }
 }
 
+float normalize_angle(float angle) {
+    while (angle < 0) {
+        angle += 2 * M_PI;
+    }
+    while (angle >= 2 * M_PI) {
+        angle -= 2 * M_PI;
+    }
+    return angle;
+}
+
 void render_enemies(SDL_Renderer *renderer) {
     for (int i = 0; i < num_enemies; i++) {
-        if (is_line_of_sight_blocked((Vector2){player.x, player.y}, (Vector2){enemies[i].x, enemies[i].y})) {
+        float angle = atan2f(enemies[i].y - player.y, enemies[i].x - player.x);
+
+        float relative_angle = player.direction - angle;
+        if (relative_angle > M_PI) {
+            relative_angle -= 2 * M_PI;
+        }
+        /* Check if the enemy is in the player's field of view */
+        if (relative_angle < -FOV / 2.0 || relative_angle > FOV / 2.0) {
             continue;
         }
-
-
-        float angle = atan2f(enemies[i].y - player.y, enemies[i].x - player.x);
-        if (angle < 0) {
-            angle += 2 * M_PI;
-        }
         float distance_to_enemy = sqrtf(powf(enemies[i].x - player.x, 2) + powf(enemies[i].y - player.y, 2));
-        float relative_angle = player.direction - angle;
 
-        // Check if the enemy is in the player's field of view
-        if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
-            int line_height = (int)(WINDOW_HEIGHT / distance_to_enemy);
+        /* Fisheye effect correction */
+        distance_to_enemy *= cosf(relative_angle);
+        int line_height = (int)(WINDOW_HEIGHT / distance_to_enemy);
 
-            // Calculate the horizontal position of the enemy on the screen
-            int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
+        /* Calculate the horizontal position of the enemy on the screen */
+        int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
 
-            // Calculate the size of the enemy square, taking perspective into account
-            int square_size = (int)(line_height * 0.5);
+        /* Calculate the size of the sprite, taking perspective (line height)
+         * into account */
+        int sprite_size = (int)(line_height);
 
-            // Set the color and render of dangerous enemy as a big brown
-            // square, harmless enemies are green
-            if (enemies[i].harmless) {
-                SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Green
-            } else {
-                SDL_SetRenderDrawColor(renderer, 139, 69, 19, 255); // Brown color
+        /* Set the source and destination rectangles for the texture */
+        int texture_w, texture_h;
+        SDL_QueryTexture(poo_texture, NULL, NULL, &texture_w, &texture_h);
+
+        /* Render the texture column by column */
+        for (int col = 0; col < sprite_size; col++) {
+            int screen_col = screen_x - sprite_size / 2 + col;
+            int wall_line_height = line_height_buffer[screen_col];
+            if (line_height >= wall_line_height) {
+                /* Calculate the source and destination rectangles for the
+                 * current column. Note that ceilf here is necessary to avoid
+                 * zero-width rectangles */
+                SDL_Rect src_rect = {ceilf(col * (float)texture_w / sprite_size), 0, ceilf((float)texture_w / sprite_size), texture_h};
+                SDL_Rect dest_rect = {(screen_x - sprite_size / 2) + col, (WINDOW_HEIGHT - sprite_size) / 2, 1, sprite_size};
+
+                /* Render the current column of the texture */
+                SDL_RenderCopyEx(renderer, poo_texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
             }
-            SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
-            SDL_RenderFillRect(renderer, &square);
         }
     }
 }
