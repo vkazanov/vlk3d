@@ -4,7 +4,7 @@ Nika's ideas:
 
 - [ ] fireworks when winning
 
-- [ ] different kinds of monsters: moving, hiding, shooting
+- [ ] different kinds of monsters: moving, hiding, shooting, poo, flies
 
 - [ ] room doors
 
@@ -14,12 +14,15 @@ Nika's ideas:
 
 My ideas:
 
+- [X] fix texture mapping
+
+- [X] png textures
+
 - [ ] loading a map from cli args
 
-- [ ] fix texture mapping
-
-- [ ] monsters overlapping (z-buffering? check how it's done in wolf3d)
+- [ ] monsters overlapping: ray depth buffering used to find out whether sprite column
+  should be painted
 
 - [ ] double buffering for cleaner animated feeling
 
-- [ ] monsters bouding box (visible part should)
+- [ ] monsters bouding box (on the visible part should be hittable)
