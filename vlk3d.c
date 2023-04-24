@@ -249,10 +249,12 @@ int main(int argc, char *argv[]) {
 
     Mix_FreeMusic(music);
     Mix_CloseAudio();
+
     SDL_DestroyTexture(wall_texture);
     SDL_DestroyTexture(poo_texture);
     SDL_DestroyTexture(fly_texture);
     SDL_DestroyTexture(brush_texture);
+
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     TTF_CloseFont(font);

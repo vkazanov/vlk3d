@@ -39,6 +39,8 @@ My ideas:
 
 - [X] monsters bouding box (on the visible part should be hittable)
 
+- [ ] sprites should be draw from furthers to closest
+
 - [ ] nicer map specification
 
   - [ ] numbers for wall textures
