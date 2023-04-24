@@ -79,6 +79,7 @@ Player player = {0, 0, 0};
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
 typedef struct {
+    SDL_Texture *texture;
     float x, y;
     float hit_distance;
     bool is_visible;
@@ -104,6 +105,10 @@ bool should_render(Sprite *sprite);
 
 void init_poo(Sprite *sprite, int x, int y);
 void poo_hit(Sprite *sprite);
+
+void init_fly(Sprite *sprite, int x, int y);
+void fly_hit(Sprite *sprite);
+
 
 void update_projectiles();
 void render_projectiles(SDL_Renderer *renderer);
@@ -417,6 +422,7 @@ bool should_render(Sprite *sprite) {
 
 void init_poo(Sprite *sprite, int x, int y) {
     *sprite = (typeof(*sprite)) {
+        .texture = poo_texture,
         .x = x + 0.5,
         .y = y + 0.5,
         .is_harmless = false,
@@ -426,6 +432,22 @@ void init_poo(Sprite *sprite, int x, int y) {
 }
 
 void poo_hit(Sprite *sprite) {
+    sprite->is_harmless = true;
+    sprite->is_visible = false;
+}
+
+void init_fly(Sprite *sprite, int x, int y) {
+    *sprite = (typeof(*sprite)) {
+        .texture = fly_texture,
+        .x = x + 0.5,
+        .y = y + 0.5,
+        .is_harmless = false,
+        .is_visible = true,
+        .hit_distance = 0.25
+    };
+}
+
+void fly_hit(Sprite *sprite) {
     sprite->is_harmless = true;
     sprite->is_visible = false;
 }
@@ -562,7 +584,7 @@ void render_sprites(SDL_Renderer *renderer) {
             SDL_Rect dest_rect = {(screen_x - sprite_size / 2) + col, (WINDOW_HEIGHT - sprite_size) / 2, 1, sprite_size};
 
             /* Render the current column of the texture */
-            SDL_RenderCopyEx(renderer, poo_texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
+            SDL_RenderCopyEx(renderer, sprites[i].texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
         }
     }
 }
@@ -608,12 +630,19 @@ void load_map(const char *filename) {
                 map[y][x] = 0;
                 player_start_found = true;
             } else if (map[y][x] == 2) {
-                /* do not overflow the number of sprits */
                 if (num_sprites >= MAX_SPRITES) {
                     fprintf(stderr, "No starting position found in the map file: %s\n", filename);
                     exit(1);
                 }
                 init_poo(&sprites[num_sprites], x, y);;
+                num_sprites++;
+                map[y][x] = 0;
+            } else if (map[y][x] == 3) {
+                if (num_sprites >= MAX_SPRITES) {
+                    fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+                    exit(1);
+                }
+                init_fly(&sprites[num_sprites], x, y);;
                 num_sprites++;
                 map[y][x] = 0;
             }
