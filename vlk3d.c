@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <math.h>
 #include <float.h>
+#include <time.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -78,13 +79,15 @@ Player player = {0, 0, 0};
 
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
-typedef struct {
+typedef struct Sprite Sprite;
+struct Sprite {
     SDL_Texture *texture;
     float x, y;
     float hit_distance;
     bool is_visible;
     bool is_harmless;
-} Sprite;
+    void (*update) (Sprite *Sprite, Uint32 elapsed_time);
+};
 
 #define MAX_SPRITES 50
 Sprite sprites[MAX_SPRITES];
@@ -105,11 +108,13 @@ bool should_render(Sprite *sprite);
 
 void init_poo(Sprite *sprite, int x, int y);
 void poo_hit(Sprite *sprite);
+void poo_hit(Sprite *sprite);
 
 void init_fly(Sprite *sprite, int x, int y);
 void fly_hit(Sprite *sprite);
+void fly_update(Sprite *sprite, Uint32 elapsed_time);
 
-
+void update_sprites();
 void update_projectiles();
 void render_projectiles(SDL_Renderer *renderer);
 void render_sprites(SDL_Renderer *renderer);
@@ -121,6 +126,8 @@ void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SD
 void wait_for_key_press();
 
 int main(int argc, char *argv[]) {
+    srand(time(NULL));
+
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         fprintf(stderr, "SDL could not initialize: %s\n", SDL_GetError());
         return 1;
@@ -253,8 +260,13 @@ int main(int argc, char *argv[]) {
 game_result_t game_loop(SDL_Renderer *renderer) {
     bool is_running = true;
     SDL_Event event;
+    Uint32 current_time, last_time;
 
     while (is_running) {
+        current_time = SDL_GetTicks();
+        Uint32 elapsed_time = current_time - last_time;
+        last_time = current_time;
+
         while (SDL_PollEvent(&event))
             handle_events(&event, &is_running);
 
@@ -264,7 +276,9 @@ game_result_t game_loop(SDL_Renderer *renderer) {
         if (has_no_things_to_do())
             return GAME_RESULT_WIN;
 
-        update_projectiles();
+        update_projectiles(elapsed_time);
+        update_sprites(elapsed_time);
+
         render(renderer);
         render_projectiles(renderer);
         render_sprites(renderer);
@@ -461,13 +475,57 @@ void init_fly(Sprite *sprite, int x, int y) {
         .y = y + 0.5,
         .is_harmless = false,
         .is_visible = true,
-        .hit_distance = 0.25
+        .hit_distance = 0.25,
+        .update = fly_update
     };
 }
 
 void fly_hit(Sprite *sprite) {
     sprite->is_harmless = true;
     sprite->is_visible = false;
+}
+
+float random_float(float min, float max) {
+    float scale = rand() / (float) RAND_MAX;
+    return min + scale * (max - min);
+}
+
+void fly_update(Sprite *sprite, Uint32 elapsed_time) {
+    /* Speed factor*/
+    const float speed = 0.002f;
+
+    /* random directions */
+    float dx = random_float(-1.0f, 1.0f);
+    float dy = random_float(-1.0f, 1.0f);
+
+    /* Scale the movement by the elapsed time and speed factor */
+    dx *= elapsed_time * speed;
+    dy *= elapsed_time * speed;
+
+    /* Calculate the new position */
+    float new_x = sprite->x + dx;
+    float new_y = sprite->y + dy;
+
+    /* Check if the new position is within map boundaries and not a wall */
+    int new_tile_x = (int)new_x;
+    int new_tile_y = (int)new_y;
+
+    if (new_tile_x >= 0 && new_tile_x < map_width &&
+        new_tile_y >= 0 && new_tile_y < map_height &&
+        map[new_tile_y][new_tile_x] != 1) {
+
+        sprite->x = new_x;
+        sprite->y = new_y;
+    }
+}
+
+
+void update_sprites(Uint32 elapsed_time) {
+    for (int i = 0; i < num_sprites; i++) {
+        void (*update_function) = sprites[i].update;
+        if (update_function)
+            sprites[i].update(&sprites[i], elapsed_time);
+    }
 }
 
 void update_projectiles() {
