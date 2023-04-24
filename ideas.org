@@ -4,9 +4,19 @@ Nika's ideas:
 
 - [ ] fireworks when winning
 
-- [ ] different kinds of monsters: moving, hiding, shooting, poo, flies
+- [-] different kinds of monsters: moving, hiding, shooting, poo, flies
+
+  - [X] poo
+
+  - [X] flies
+
+  - [ ] unfinished apples
+
+  - [ ] untidy bed
 
 - [ ] room doors
+
+- [ ] better projectile
 
 - [ ] coins
 
@@ -18,11 +28,13 @@ My ideas:
 
 - [X] png textures
 
-- [ ] loading a map from cli args
-
-- [ ] monsters overlapping: ray depth buffering used to find out whether sprite column
+- [X] monsters overlapping: ray depth buffering used to find out whether sprite column
   should be painted
+
+- [ ]
+
+- [ ] monsters bouding box (on the visible part should be hittable)
 
 - [ ] double buffering for cleaner animated feeling
 
-- [ ] monsters bouding box (on the visible part should be hittable)
+- [ ] loading a map from cli args
