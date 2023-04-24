@@ -80,12 +80,14 @@ Player player = {0, 0, 0};
 
 typedef struct {
     float x, y;
-    bool harmless;
-} Enemy;
+    float hit_distance;
+    bool is_visible;
+    bool is_harmless;
+} Sprite;
 
-#define MAX_ENEMIES 50
-Enemy enemies[MAX_ENEMIES];
-int num_enemies = 0;
+#define MAX_SPRITES 50
+Sprite sprites[MAX_SPRITES];
+int num_sprites = 0;
 
 
 /* Function prototypes */
@@ -97,12 +99,15 @@ float cast_ray(float angle);
 bool is_wall_collision(float x, float y);
 bool is_horizontal_wall(Vector2 position);
 bool is_close_to_enemy(float x, float y);
-bool is_line_of_sight_blocked(Vector2 start, Vector2 end);
-bool has_no_enemies();
+bool has_no_things_to_do();
+bool should_render(Sprite *sprite);
+
+void init_poo(Sprite *sprite, int x, int y);
+void poo_hit(Sprite *sprite);
 
 void update_projectiles();
 void render_projectiles(SDL_Renderer *renderer);
-void render_enemies(SDL_Renderer *renderer);
+void render_sprites(SDL_Renderer *renderer);
 void fire_projectile();
 void free_projectiles();
 void free_map();
@@ -233,13 +238,13 @@ game_result_t game_loop(SDL_Renderer *renderer) {
         if (is_close_to_enemy(player.x, player.y))
             return GAME_RESULT_DIE;
 
-        if (has_no_enemies())
+        if (has_no_things_to_do())
             return GAME_RESULT_WIN;
 
         update_projectiles();
         render(renderer);
         render_projectiles(renderer);
-        render_enemies(renderer);
+        render_sprites(renderer);
 
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
@@ -388,47 +393,41 @@ bool is_horizontal_wall(Vector2 position) {
 }
 
 bool is_close_to_enemy(float x, float y) {
-    for (int i = 0; i < num_enemies; i++) {
-        float distance = sqrtf(powf(x - enemies[i].x, 2) + powf(y - enemies[i].y, 2));
-        if (distance < ENEMY_PROXIMITY_DISTANCE && !enemies[i].harmless) {
+    for (int i = 0; i < num_sprites; i++) {
+        float distance = sqrtf(powf(x - sprites[i].x, 2) + powf(y - sprites[i].y, 2));
+        if (distance < ENEMY_PROXIMITY_DISTANCE && !sprites[i].is_harmless) {
             return true;
         }
     }
     return false;
 }
 
-bool is_line_of_sight_blocked(Vector2 start, Vector2 end) {
-    Vector2 direction = {end.x - start.x, end.y - start.y};
-    float distance = sqrtf(direction.x * direction.x + direction.y * direction.y);
-    direction.x /= distance;
-    direction.y /= distance;
-
-    float current_distance = 0.0;
-    Vector2 position = {start.x, start.y};
-
-    while (current_distance < distance) {
-        position.x += direction.x * 0.1;
-        position.y += direction.y * 0.1;
-        current_distance += 0.1;
-
-        int mapX = (int)floor(position.x);
-        int mapY = (int)floor(position.y);
-
-        if (mapX >= 0 && mapX < map_width && mapY >= 0 && mapY < map_height && map[mapY][mapX] == 1) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-bool has_no_enemies() {
-    for (int i = 0; i < num_enemies; i++) {
-        if (!enemies[i].harmless) {
+bool has_no_things_to_do() {
+    for (int i = 0; i < num_sprites; i++) {
+        if (!sprites[i].is_harmless) {
             return false;
         }
     }
     return true;
+}
+
+bool should_render(Sprite *sprite) {
+    return sprite->is_visible;
+}
+
+void init_poo(Sprite *sprite, int x, int y) {
+    *sprite = (typeof(*sprite)) {
+        .x = x + 0.5,
+        .y = y + 0.5,
+        .is_harmless = false,
+        .is_visible = true,
+        .hit_distance = 0.5
+    };
+}
+
+void poo_hit(Sprite *sprite) {
+    sprite->is_harmless = true;
+    sprite->is_visible = false;
 }
 
 void update_projectiles() {
@@ -446,14 +445,15 @@ void update_projectiles() {
         }
 
         // Check for collisions with enemies
-        for (int j = 0; j < num_enemies; j++) {
-            float dx = enemies[j].x - current->position.x;
-            float dy = enemies[j].y - current->position.y;
+        for (int j = 0; j < num_sprites; j++) {
+            float dx = sprites[j].x - current->position.x;
+            float dy = sprites[j].y - current->position.y;
             float distance = sqrtf(dx * dx + dy * dy);
 
-            if (distance < 0.5) { // Collision detected, adjust this value as needed
+            if (distance < sprites[j].hit_distance) {
                 remove_projectile = true;
-                enemies[j].harmless = true; // Make the enemy harmless
+                sprites[j].is_harmless = true;
+                sprites[j].is_visible = false;
             }
         }
 
@@ -505,21 +505,15 @@ void render_projectiles(SDL_Renderer *renderer) {
     }
 }
 
-float normalize_angle(float angle) {
-    while (angle < 0) {
-        angle += 2 * M_PI;
-    }
-    while (angle >= 2 * M_PI) {
-        angle -= 2 * M_PI;
-    }
-    return angle;
-}
-
-void render_enemies(SDL_Renderer *renderer) {
-    for (int i = 0; i < num_enemies; i++) {
+void render_sprites(SDL_Renderer *renderer) {
+    for (int i = 0; i < num_sprites; i++) {
+        /* check if the sprite should be rendered at all  */
+        if (!should_render(&sprites[i])) {
+            continue;
+        }
 
         /* Angle between a player space positive x-axis and enemy's positiion */
-        float angle = atan2f(enemies[i].y - player.y, enemies[i].x - player.x);
+        float angle = atan2f(sprites[i].y - player.y, sprites[i].x - player.x);
 
         /* Find the angle between player's direction vector and the enemy and
          * normalize it */
@@ -534,8 +528,10 @@ void render_enemies(SDL_Renderer *renderer) {
         }
 
         /* Distance and fisheye effect correction */
-        float distance_to_enemy = sqrtf(powf(enemies[i].x - player.x, 2) + powf(enemies[i].y - player.y, 2));
+        float distance_to_enemy = sqrtf(powf(sprites[i].x - player.x, 2) + powf(sprites[i].y - player.y, 2));
         distance_to_enemy *= cosf(relative_angle);
+
+        /* Sprite line height based on the distance to the enemy  */
         int line_height = (int)(WINDOW_HEIGHT / distance_to_enemy);
 
         /* Calculate the horizontal position of the enemy on the screen */
@@ -612,12 +608,13 @@ void load_map(const char *filename) {
                 map[y][x] = 0;
                 player_start_found = true;
             } else if (map[y][x] == 2) {
-                if (num_enemies < MAX_ENEMIES) {
-                    enemies[num_enemies].x = x + 0.5;
-                    enemies[num_enemies].y = y + 0.5;
-                    enemies[num_enemies].harmless = false;
-                    num_enemies++;
+                /* do not overflow the number of sprits */
+                if (num_sprites >= MAX_SPRITES) {
+                    fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+                    exit(1);
                 }
+                init_poo(&sprites[num_sprites], x, y);;
+                num_sprites++;
                 map[y][x] = 0;
             }
 
