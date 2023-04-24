@@ -90,7 +90,7 @@ int num_enemies = 0;
 
 /* Function prototypes */
 
-game_result_t game_loop(SDL_Window *window, SDL_Renderer *renderer);
+game_result_t game_loop(SDL_Renderer *renderer);
 void handle_events(SDL_Event *event, bool *is_running);
 void render(SDL_Renderer *renderer);
 float cast_ray(float angle);
@@ -189,7 +189,7 @@ int main(int argc, char *argv[]) {
 
     SDL_Color white = {255, 255, 255, 255};
     SDL_Color black = {0, 0, 0, 255}; // New outline color
-    switch (game_loop(window, renderer)) {
+    switch (game_loop(renderer)) {
     case GAME_RESULT_WIN:
         render_text(renderer, "You win!", font, white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24);
         SDL_RenderPresent(renderer);
@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-game_result_t game_loop(SDL_Window *window, SDL_Renderer *renderer) {
+game_result_t game_loop(SDL_Renderer *renderer) {
     bool is_running = true;
     SDL_Event event;
 
