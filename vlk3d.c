@@ -515,6 +515,9 @@ float normalize_angle(float angle) {
 }
 
 void render_enemies(SDL_Renderer *renderer) {
+    int texture_w, texture_h;
+    SDL_QueryTexture(poo_texture, NULL, NULL, &texture_w, &texture_h);
+
     for (int i = 0; i < num_enemies; i++) {
 
         /* Angle between a player space positive x-axis and enemy's positiion */
@@ -531,37 +534,36 @@ void render_enemies(SDL_Renderer *renderer) {
         if (relative_angle < -FOV / 2.0 || relative_angle > FOV / 2.0) {
             continue;
         }
-        float distance_to_enemy = sqrtf(powf(enemies[i].x - player.x, 2) + powf(enemies[i].y - player.y, 2));
 
-        /* Fisheye effect correction */
+        /* Distance and fisheye effect correction */
+        float distance_to_enemy = sqrtf(powf(enemies[i].x - player.x, 2) + powf(enemies[i].y - player.y, 2));
         distance_to_enemy *= cosf(relative_angle);
         int line_height = (int)(WINDOW_HEIGHT / distance_to_enemy);
 
         /* Calculate the horizontal position of the enemy on the screen */
         int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
 
-        /* Calculate the size of the sprite, taking perspective (line height)
-         * into account */
-        int sprite_size = (int)(line_height);
-
-        /* Set the source and destination rectangles for the texture */
-        int texture_w, texture_h;
-        SDL_QueryTexture(poo_texture, NULL, NULL, &texture_w, &texture_h);
+        /* Calculate the size of the sprite */
+        const int sprite_size = (int)(line_height);
 
         /* Render the texture column by column */
         for (int col = 0; col < sprite_size; col++) {
             int screen_col = screen_x - sprite_size / 2 + col;
-            int wall_line_height = line_height_buffer[screen_col];
-            if (line_height >= wall_line_height) {
-                /* Calculate the source and destination rectangles for the
-                 * current column. Note that ceilf here is necessary to avoid
-                 * zero-width rectangles */
-                SDL_Rect src_rect = {ceilf(col * (float)texture_w / sprite_size), 0, ceilf((float)texture_w / sprite_size), texture_h};
-                SDL_Rect dest_rect = {(screen_x - sprite_size / 2) + col, (WINDOW_HEIGHT - sprite_size) / 2, 1, sprite_size};
 
-                /* Render the current column of the texture */
-                SDL_RenderCopyEx(renderer, poo_texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
-            }
+            /* see if the wall column for this ray is further away than sprite
+             * column. Ignore otherise.*/
+            int wall_line_height = line_height_buffer[screen_col];
+            if (line_height < wall_line_height)
+                continue;
+
+            /* Calculate the source and destination rectangles for the
+             * current column. Note that ceilf here is necessary to avoid
+             * zero-width rectangles */
+            SDL_Rect src_rect = {ceilf(col * (float)texture_w / sprite_size), 0, ceilf((float)texture_w / sprite_size), texture_h};
+            SDL_Rect dest_rect = {(screen_x - sprite_size / 2) + col, (WINDOW_HEIGHT - sprite_size) / 2, 1, sprite_size};
+
+            /* Render the current column of the texture */
+            SDL_RenderCopyEx(renderer, poo_texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
         }
     }
 }
