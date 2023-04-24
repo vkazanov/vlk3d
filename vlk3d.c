@@ -674,6 +674,8 @@ void render_sprites(SDL_Renderer *renderer) {
 
 void fire_projectile(void) {
     Sprite *projectile = &sprites[0];
+    if (projectile->is_visible)
+        return;
     projectile->direction = (Vector2){cosf(player.direction), sinf(player.direction)};
     projectile->x = player.x;
     projectile->y = player.y;
