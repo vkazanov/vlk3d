@@ -5,11 +5,11 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_mixer.h>
 
 /* The simplest game skeleton.
 
-   Compile with something like:
-   gcc -o vlk3d vlk3d.c (sdl2-config --cflags --libs) -lm -lSDL2_image -lSDL2_ttf; and ./vlk3d
+   See the Makefile for how to compile
 */
 
 
@@ -121,8 +121,22 @@ void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SD
 void wait_for_key_press();
 
 int main(int argc, char *argv[]) {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
         fprintf(stderr, "SDL could not initialize: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+        printf("Error initializing SDL_mixer: %s\n", Mix_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    Mix_Music *music = Mix_LoadMUS("melody.mid");
+    if (!music) {
+        printf("Error loading MIDI file: %s\n", Mix_GetError());
+        Mix_CloseAudio();
+        SDL_Quit();
         return 1;
     }
 
@@ -195,6 +209,8 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    Mix_PlayMusic(music, -1);
+
     load_map("map.txt");
 
     SDL_Color white = {255, 255, 255, 255};
@@ -218,6 +234,8 @@ int main(int argc, char *argv[]) {
     free_projectiles();
     free_map();
 
+    Mix_FreeMusic(music);
+    Mix_CloseAudio();
     SDL_DestroyTexture(wall_texture);
     SDL_DestroyTexture(poo_texture);
     SDL_DestroyTexture(fly_texture);
