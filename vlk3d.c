@@ -59,6 +59,9 @@ typedef struct Projectile {
 
 int line_height_buffer[RAY_COUNT] = {0};
 
+#define TEXTURE_WIDTH 128
+#define TEXTURE_HEIGHT 128
+
 SDL_Texture *wall_texture = NULL;
 SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
@@ -304,8 +307,6 @@ void render(SDL_Renderer *renderer) {
     SDL_RenderFillRect(renderer, &floor_rect);
 
     /* Draw walls using texture mapping */
-    int texture_w, texture_h;
-    SDL_QueryTexture(wall_texture, NULL, NULL, &texture_w, &texture_h);
     const float rays_per_column = (WINDOW_WIDTH / RAY_COUNT);
     const float angle_per_ray = (FOV / (float)RAY_COUNT);
 
@@ -335,9 +336,9 @@ void render(SDL_Renderer *renderer) {
         }
 
         /* Set the source rectangle for the texture */
-        int tex_rect_x = (int)(tex_x * (float)texture_w);
+        int tex_rect_x = (int)(tex_x * (float)TEXTURE_WIDTH);
         int tex_rect_y = 0;
-        SDL_Rect src_rect = {tex_rect_x, tex_rect_y, 1, texture_h};
+        SDL_Rect src_rect = {tex_rect_x, tex_rect_y, 1, TEXTURE_HEIGHT};
 
         /* Set the destination rectangle for the texture */
         SDL_Rect dest_rect = {i * rays_per_column, (WINDOW_HEIGHT - line_height) / 2, rays_per_column, line_height};
@@ -515,9 +516,6 @@ float normalize_angle(float angle) {
 }
 
 void render_enemies(SDL_Renderer *renderer) {
-    int texture_w, texture_h;
-    SDL_QueryTexture(poo_texture, NULL, NULL, &texture_w, &texture_h);
-
     for (int i = 0; i < num_enemies; i++) {
 
         /* Angle between a player space positive x-axis and enemy's positiion */
@@ -564,7 +562,7 @@ void render_enemies(SDL_Renderer *renderer) {
             /* Calculate the source and destination rectangles for the
              * current column. Note that ceilf here is necessary to avoid
              * zero-width rectangles */
-            SDL_Rect src_rect = {ceilf(col * (float)texture_w / sprite_size), 0, ceilf((float)texture_w / sprite_size), texture_h};
+            SDL_Rect src_rect = {ceilf(col * (float)TEXTURE_WIDTH / sprite_size), 0, ceilf((float)TEXTURE_WIDTH / sprite_size), TEXTURE_HEIGHT};
             SDL_Rect dest_rect = {(screen_x - sprite_size / 2) + col, (WINDOW_HEIGHT - sprite_size) / 2, 1, sprite_size};
 
             /* Render the current column of the texture */
