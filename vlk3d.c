@@ -66,6 +66,7 @@ int line_height_buffer[RAY_COUNT] = {0};
 SDL_Texture *wall_texture = NULL;
 SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
+SDL_Texture *brush_texture = NULL;
 
 /* Game state */
 
@@ -83,6 +84,7 @@ typedef struct Sprite Sprite;
 struct Sprite {
     SDL_Texture *texture;
     float x, y;
+    Vector2 direction;
     float hit_distance;
     bool is_visible;
     bool is_harmless;
@@ -114,13 +116,14 @@ void init_fly(Sprite *sprite, int x, int y);
 void fly_hit(Sprite *sprite);
 void fly_update(Sprite *sprite, Uint32 elapsed_time);
 
+void init_projectile(Sprite *sprite);
+void projectile_update(Sprite *sprite, Uint32 elapsed_time);
+
 void update_sprites(Uint32 elapsed_time);
-void update_projectiles(Uint32 elapsed_time);
 
 void render_projectiles(SDL_Renderer *renderer);
 void render_sprites(SDL_Renderer *renderer);
 void fire_projectile(void);
-void free_projectiles(void);
 void free_map(void);
 void load_map(const char *filename);
 void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y);
@@ -194,7 +197,8 @@ int main(int argc, char *argv[]) {
     SDL_Surface *wall_surface = IMG_Load("wallpaper.png");
     SDL_Surface *fly_surface = IMG_Load("fly.png");
     SDL_Surface *poo_surface = IMG_Load("poo.png");
-    if (wall_surface == NULL || fly_surface == NULL || poo_surface == NULL) {
+    SDL_Surface *brush_surface = IMG_Load("brush.png");
+    if (wall_surface == NULL || fly_surface == NULL || poo_surface == NULL || brush_surface == NULL) {
         fprintf(stderr, "Failed to load a texture: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
@@ -204,10 +208,12 @@ int main(int argc, char *argv[]) {
     wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
     fly_texture = SDL_CreateTextureFromSurface(renderer, fly_surface);
     poo_texture = SDL_CreateTextureFromSurface(renderer, poo_surface);
+    brush_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
 
     SDL_FreeSurface(wall_surface);
     SDL_FreeSurface(fly_surface);
     SDL_FreeSurface(poo_surface);
+    SDL_FreeSurface(brush_surface);
 
     if (wall_texture == NULL || fly_texture == NULL || poo_texture == NULL) {
         fprintf(stderr, "Failed to create a texture: %s\n", SDL_GetError());
@@ -239,7 +245,6 @@ int main(int argc, char *argv[]) {
         break;
     }
 
-    free_projectiles();
     free_map();
 
     Mix_FreeMusic(music);
@@ -247,11 +252,12 @@ int main(int argc, char *argv[]) {
     SDL_DestroyTexture(wall_texture);
     SDL_DestroyTexture(poo_texture);
     SDL_DestroyTexture(fly_texture);
+    SDL_DestroyTexture(brush_texture);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     TTF_CloseFont(font);
     TTF_Quit();
-    IMG_Quit();  // Call this when you're done with SDL_image
+    IMG_Quit();
 
     SDL_Quit();
 
@@ -261,7 +267,7 @@ int main(int argc, char *argv[]) {
 game_result_t game_loop(SDL_Renderer *renderer) {
     bool is_running = true;
     SDL_Event event;
-    Uint32 current_time, last_time;
+    Uint32 current_time, last_time = SDL_GetTicks();
 
     while (is_running) {
         current_time = SDL_GetTicks();
@@ -277,7 +283,6 @@ game_result_t game_loop(SDL_Renderer *renderer) {
         if (has_no_things_to_do())
             return GAME_RESULT_WIN;
 
-        update_projectiles(elapsed_time);
         update_sprites(elapsed_time);
 
         render(renderer);
@@ -488,6 +493,47 @@ void fly_hit(Sprite *sprite) {
     sprite->is_visible = false;
 }
 
+void init_projectile(Sprite *sprite) {
+    *sprite = (typeof(*sprite)) {
+        .texture = brush_texture,
+        .is_visible = false,
+        .is_harmless = true,
+        .hit_distance = 100,
+        .update = projectile_update
+    };
+
+}
+
+void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
+    if (!projectile->is_visible)
+        return;
+
+    float dx = projectile->direction.x * PROJECTILE_SPEED * elapsed_time;
+    float dy = projectile->direction.y * PROJECTILE_SPEED * elapsed_time;
+
+    projectile->x += dx;
+    projectile->y += dy;
+
+    if (is_wall_collision(projectile->x, projectile->y)) {
+        projectile->is_visible = false;
+        return;
+    }
+
+    /* check all other sprites but skip the first one - itself */
+    for (int j = 1; j < num_sprites; j++) {
+        float dist_x = sprites[j].x - projectile->x;
+        float dist_y = sprites[j].y - projectile->y;
+        float distance = sqrtf(dist_x * dist_x + dist_y * dist_y);
+
+        if (distance < sprites[j].hit_distance) {
+            projectile->is_visible = false;
+            sprites[j].hit(&sprites[j]);
+            return;
+        }
+    }
+}
+
+
 float random_float(float min, float max) {
     float scale = rand() / (float) RAND_MAX;
     return min + scale * (max - min);
@@ -528,52 +574,6 @@ void update_sprites(Uint32 elapsed_time) {
         void (*update_function) = sprites[i].update;
         if (update_function)
             sprites[i].update(&sprites[i], elapsed_time);
-    }
-}
-
-void update_projectiles(Uint32 elapsed_time) {
-    Projectile *current = projectiles;
-    Projectile *prev = NULL;
-
-    while (current != NULL) {
-        float dx = current->direction.x * PROJECTILE_SPEED * elapsed_time;
-        float dy = current->direction.y * PROJECTILE_SPEED * elapsed_time;
-
-        current->position.x += dx;
-        current->position.y += dy;
-
-        bool remove_projectile = false;
-
-        if (is_wall_collision(current->position.x, current->position.y)) {
-            remove_projectile = true;
-        }
-
-        // Check for collisions with enemies
-        for (int j = 0; j < num_sprites; j++) {
-            float dist_x = sprites[j].x - current->position.x;
-            float dist_y = sprites[j].y - current->position.y;
-            float distance = sqrtf(dist_x * dist_x + dist_y * dist_y);
-
-            if (distance < sprites[j].hit_distance) {
-                remove_projectile = true;
-                sprites[j].hit(&sprites[j]);
-            }
-        }
-
-        if (remove_projectile) {
-            if (prev) {
-                prev->next = current->next;
-            } else {
-                projectiles = current->next;
-            }
-
-            Projectile *to_remove = current;
-            current = current->next;
-            free(to_remove);
-        } else {
-            prev = current;
-            current = current->next;
-        }
     }
 }
 
@@ -671,22 +671,11 @@ void render_sprites(SDL_Renderer *renderer) {
 }
 
 void fire_projectile(void) {
-    Projectile *new_projectile = (Projectile *)malloc(sizeof(Projectile));
-    new_projectile->position = (Vector2){player.x, player.y};
-    new_projectile->direction = (Vector2){cosf(player.direction), sinf(player.direction)};
-    new_projectile->next = projectiles;
-
-    projectiles = new_projectile;
-}
-
-void free_projectiles() {
-    Projectile *current = projectiles;
-
-    while (current != NULL) {
-        Projectile *to_remove = current;
-        current = current->next;
-        free(to_remove);
-    }
+    Sprite *projectile = &sprites[0];
+    projectile->direction = (Vector2){cosf(player.direction), sinf(player.direction)};
+    projectile->x = player.x;
+    projectile->y = player.y;
+    projectile->is_visible = true;
 }
 
 void load_map(const char *filename) {
@@ -700,6 +689,11 @@ void load_map(const char *filename) {
 
     map = (int **)malloc(map_height * sizeof(int *));
     bool player_start_found = false;
+
+    /* the first sprite is always the projectile */
+    init_projectile(&sprites[0]);
+    num_sprites = 1;
+
     for (int y = 0; y < map_height; y++) {
         map[y] = (int *)malloc(map_width * sizeof(int));
         for (int x = 0; x < map_width; x++) {

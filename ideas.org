@@ -1,5 +1,7 @@
 Nika's ideas:
 
+- [X] better projectile
+
 - [ ] colorful win/lose letters
 
 - [ ] fireworks when winning
@@ -14,9 +16,13 @@ Nika's ideas:
 
   - [ ] untidy bed
 
-- [ ] room doors
+  - [ ] dangerous cat paws
 
-- [ ] better projectile
+  - [ ] flowers to water
+
+- [ ] windows
+
+- [ ] room doors
 
 - [ ] coins
 
@@ -31,9 +37,13 @@ My ideas:
 - [X] monsters overlapping: ray depth buffering used to find out whether sprite column
   should be painted
 
-- [ ]
+- [X] monsters bouding box (on the visible part should be hittable)
 
-- [ ] monsters bouding box (on the visible part should be hittable)
+- [ ] nicer map specification
+
+  - [ ] numbers for wall textures
+
+  - [ ] letters for mosters and other sprites
 
 - [ ] double buffering for cleaner animated feeling
 
