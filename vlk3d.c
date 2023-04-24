@@ -53,7 +53,7 @@ typedef struct Projectile {
     struct Projectile *next;
 } Projectile;
 
-#define PROJECTILE_SPEED 0.1
+#define PROJECTILE_SPEED 0.003f
 #define PROJECTILE_COLOR_R 255
 #define PROJECTILE_COLOR_G 0
 #define PROJECTILE_COLOR_B 0
@@ -87,6 +87,7 @@ struct Sprite {
     bool is_visible;
     bool is_harmless;
     void (*update) (Sprite *Sprite, Uint32 elapsed_time);
+    void (*hit) (Sprite *Sprite);
 };
 
 #define MAX_SPRITES 50
@@ -108,19 +109,19 @@ bool should_render(Sprite *sprite);
 
 void init_poo(Sprite *sprite, int x, int y);
 void poo_hit(Sprite *sprite);
-void poo_hit(Sprite *sprite);
 
 void init_fly(Sprite *sprite, int x, int y);
 void fly_hit(Sprite *sprite);
 void fly_update(Sprite *sprite, Uint32 elapsed_time);
 
-void update_sprites();
-void update_projectiles();
+void update_sprites(Uint32 elapsed_time);
+void update_projectiles(Uint32 elapsed_time);
+
 void render_projectiles(SDL_Renderer *renderer);
 void render_sprites(SDL_Renderer *renderer);
-void fire_projectile();
-void free_projectiles();
-void free_map();
+void fire_projectile(void);
+void free_projectiles(void);
+void free_map(void);
 void load_map(const char *filename);
 void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y);
 void wait_for_key_press();
@@ -300,7 +301,7 @@ void handle_events(SDL_Event *event, bool *is_running) {
         if (event->key.keysym.sym == SDLK_ESCAPE) {
             *is_running = false;
         } else if (event->key.keysym.sym == SDLK_SPACE) {
-            fire_projectile(player);
+            fire_projectile();
         } else if (event->key.keysym.sym == SDLK_UP) {
             float newX = player.x + cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float newY = player.y + sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
@@ -459,7 +460,8 @@ void init_poo(Sprite *sprite, int x, int y) {
         .y = y + 0.5,
         .is_harmless = false,
         .is_visible = true,
-        .hit_distance = 0.5
+        .hit_distance = 0.5,
+        .hit = poo_hit
     };
 }
 
@@ -476,7 +478,8 @@ void init_fly(Sprite *sprite, int x, int y) {
         .is_harmless = false,
         .is_visible = true,
         .hit_distance = 0.25,
-        .update = fly_update
+        .update = fly_update,
+        .hit = fly_hit
     };
 }
 
@@ -528,13 +531,16 @@ void update_sprites(Uint32 elapsed_time) {
     }
 }
 
-void update_projectiles() {
+void update_projectiles(Uint32 elapsed_time) {
     Projectile *current = projectiles;
     Projectile *prev = NULL;
 
     while (current != NULL) {
-        current->position.x += current->direction.x * PROJECTILE_SPEED;
-        current->position.y += current->direction.y * PROJECTILE_SPEED;
+        float dx = current->direction.x * PROJECTILE_SPEED * elapsed_time;
+        float dy = current->direction.y * PROJECTILE_SPEED * elapsed_time;
+
+        current->position.x += dx;
+        current->position.y += dy;
 
         bool remove_projectile = false;
 
@@ -544,14 +550,13 @@ void update_projectiles() {
 
         // Check for collisions with enemies
         for (int j = 0; j < num_sprites; j++) {
-            float dx = sprites[j].x - current->position.x;
-            float dy = sprites[j].y - current->position.y;
-            float distance = sqrtf(dx * dx + dy * dy);
+            float dist_x = sprites[j].x - current->position.x;
+            float dist_y = sprites[j].y - current->position.y;
+            float distance = sqrtf(dist_x * dist_x + dist_y * dist_y);
 
             if (distance < sprites[j].hit_distance) {
                 remove_projectile = true;
-                sprites[j].is_harmless = true;
-                sprites[j].is_visible = false;
+                sprites[j].hit(&sprites[j]);
             }
         }
 
@@ -734,7 +739,7 @@ void load_map(const char *filename) {
     fclose(file);
 }
 
-void free_map() {
+void free_map(void) {
     for (int y = 0; y < map_height; y++) {
         free(map[y]);
     }
