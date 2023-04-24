@@ -548,7 +548,12 @@ void render_enemies(SDL_Renderer *renderer) {
 
         /* Render the texture column by column */
         for (int col = 0; col < sprite_size; col++) {
+            /* find the current sprite column to check and make sure it doesn't
+             * go above the number of rays casted - this might cause a crash
+             * when standing right next to the sprites */
             int screen_col = screen_x - sprite_size / 2 + col;
+            if (screen_col < 0 || screen_col >= RAY_COUNT)
+                continue;
 
             /* see if the wall column for this ray is further away than sprite
              * column. Ignore otherise.*/
