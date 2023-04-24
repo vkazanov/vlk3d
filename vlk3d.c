@@ -516,12 +516,17 @@ float normalize_angle(float angle) {
 
 void render_enemies(SDL_Renderer *renderer) {
     for (int i = 0; i < num_enemies; i++) {
+
+        /* Angle between a player space positive x-axis and enemy's positiion */
         float angle = atan2f(enemies[i].y - player.y, enemies[i].x - player.x);
 
+        /* Find the angle between player's direction vector and the enemy and
+         * normalize it */
         float relative_angle = player.direction - angle;
         if (relative_angle > M_PI) {
             relative_angle -= 2 * M_PI;
         }
+
         /* Check if the enemy is in the player's field of view */
         if (relative_angle < -FOV / 2.0 || relative_angle > FOV / 2.0) {
             continue;
