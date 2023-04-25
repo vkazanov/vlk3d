@@ -62,6 +62,19 @@ SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
 SDL_Texture *flower_texture = NULL;
 
+struct {
+    SDL_Texture **texture;
+    char *name;
+} name_to_texture_table[] = {
+    { &wall_texture, "wall.png"},
+    { &wall_window_texture, "wall_with_window.png"},
+    { &wall_painting_texture, "wall_painting.png"},
+    { &fly_texture, "fly.png"},
+    { &poo_texture, "poo.png"},
+    { &brush_texture, "brush.png"},
+    { &flower_texture, "flower.png"},
+};
+
 SDL_Texture **char_to_wall_texture_table[] = {
     ['1'] = &wall_texture,
     ['2'] = &wall_window_texture,
@@ -810,53 +823,29 @@ void wait_for_key_press() {
 }
 
 void load_textures(SDL_Renderer *renderer) {
-    SDL_Surface *wall_surface = IMG_Load("wall.png");
-    SDL_Surface *wall_window_surface = IMG_Load("wall_with_window.png");
-    SDL_Surface *wall_painting_surface = IMG_Load("wall_painting.png");
-    SDL_Surface *fly_surface = IMG_Load("fly.png");
-    SDL_Surface *poo_surface = IMG_Load("poo.png");
-    SDL_Surface *brush_surface = IMG_Load("brush.png");
-    SDL_Surface *flower_surface = IMG_Load("flower.png");
-    if (
-        wall_surface == NULL ||
-        fly_surface == NULL ||
-        poo_surface == NULL ||
-        brush_surface == NULL ||
-        wall_window_surface == NULL ||
-        flower_surface == NULL ||
-        wall_painting_surface == NULL
-    ) {
-        fprintf(stderr, "Failed to load a texture: %s\n", IMG_GetError());
-        exit(1);
-    }
-    wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
-    wall_window_texture = SDL_CreateTextureFromSurface(renderer, wall_window_surface);
-    wall_painting_texture = SDL_CreateTextureFromSurface(renderer, wall_painting_surface);
-    fly_texture = SDL_CreateTextureFromSurface(renderer, fly_surface);
-    poo_texture = SDL_CreateTextureFromSurface(renderer, poo_surface);
-    brush_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
-    flower_texture = SDL_CreateTextureFromSurface(renderer, flower_surface);
+    /* iterate over the name_to_texture_table and load surfaces/textures */
+    for (int i = 0; i < sizeof(name_to_texture_table) / sizeof(name_to_texture_table[0]); i++) {
+        SDL_Surface *surface = IMG_Load(name_to_texture_table[i].name);
+        if (surface == NULL) {
+            fprintf(stderr, "Failed to load a surface: %s\n", IMG_GetError());
+            exit(1);
+        }
 
-    SDL_FreeSurface(wall_surface);
-    SDL_FreeSurface(wall_window_surface);
-    SDL_FreeSurface(wall_painting_surface);
-    SDL_FreeSurface(fly_surface);
-    SDL_FreeSurface(poo_surface);
-    SDL_FreeSurface(brush_surface);
-    SDL_FreeSurface(flower_surface);
+        SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+        if (texture == NULL) {
+            fprintf(stderr, "Failed to load a texture: %s\n", IMG_GetError());
+            exit(1);
+        }
 
-    if (wall_texture == NULL || fly_texture == NULL || poo_texture == NULL || brush_surface == NULL || wall_window_surface == NULL) {
-        fprintf(stderr, "Failed to create a texture: %s\n", SDL_GetError());
-        exit(1);
+        *name_to_texture_table[i].texture = texture;
+
+        SDL_FreeSurface(surface);
     }
 }
 
 void free_textures(void) {
-    SDL_DestroyTexture(wall_texture);
-    SDL_DestroyTexture(wall_window_texture);
-    SDL_DestroyTexture(wall_painting_texture);
-    SDL_DestroyTexture(poo_texture);
-    SDL_DestroyTexture(fly_texture);
-    SDL_DestroyTexture(brush_texture);
-    SDL_DestroyTexture(flower_texture);
+    /* iterate over the name_to_texture_table and destroy textures */
+    for (int i = 0; i < sizeof(name_to_texture_table) / sizeof(name_to_texture_table[0]); i++) {
+        SDL_DestroyTexture(*name_to_texture_table[i].texture);
+    }
 }

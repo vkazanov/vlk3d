@@ -47,6 +47,8 @@ My ideas:
 
   - [X] letters for mosters and other sprites
 
+- [X] a better way to load textures/sprites (a table?)
+
 - [ ] the is_wall_collision function should use both old x/y and delta x/y to figure out
   whether map_x, map_y changed
 
