@@ -56,13 +56,16 @@ int line_height_buffer[RAY_COUNT] = {0};
 
 SDL_Texture *wall_texture = NULL;
 SDL_Texture *wall_window_texture = NULL;
+SDL_Texture *wall_painting_texture = NULL;
 SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
+SDL_Texture *flower_texture = NULL;
 
 SDL_Texture **char_to_wall_texture_table[] = {
     ['1'] = &wall_texture,
-    ['2'] = &wall_window_texture
+    ['2'] = &wall_window_texture,
+    ['3'] = &wall_painting_texture
 };
 
 /* Game state */
@@ -114,6 +117,8 @@ void poo_hit(Sprite *sprite);
 void init_fly(Sprite *sprite, int x, int y);
 void fly_hit(Sprite *sprite);
 void fly_update(Sprite *sprite, Uint32 elapsed_time);
+
+void init_flower(Sprite *sprite, int x, int y);
 
 void init_projectile(Sprite *sprite);
 void projectile_update(Sprite *sprite, Uint32 elapsed_time);
@@ -194,10 +199,20 @@ int main(int argc, char *argv[]) {
 
     SDL_Surface *wall_surface = IMG_Load("wall.png");
     SDL_Surface *wall_window_surface = IMG_Load("wall_with_window.png");
+    SDL_Surface *wall_painting_surface = IMG_Load("wall_painting.png");
     SDL_Surface *fly_surface = IMG_Load("fly.png");
     SDL_Surface *poo_surface = IMG_Load("poo.png");
     SDL_Surface *brush_surface = IMG_Load("brush.png");
-    if (wall_surface == NULL || fly_surface == NULL || poo_surface == NULL || brush_surface == NULL || wall_window_surface == NULL) {
+    SDL_Surface *flower_surface = IMG_Load("flower.png");
+    if (
+        wall_surface == NULL ||
+        fly_surface == NULL ||
+        poo_surface == NULL ||
+        brush_surface == NULL ||
+        wall_window_surface == NULL ||
+        flower_surface == NULL ||
+        wall_painting_surface == NULL
+    ) {
         fprintf(stderr, "Failed to load a texture: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
@@ -206,15 +221,19 @@ int main(int argc, char *argv[]) {
     }
     wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
     wall_window_texture = SDL_CreateTextureFromSurface(renderer, wall_window_surface);
+    wall_painting_texture = SDL_CreateTextureFromSurface(renderer, wall_painting_surface);
     fly_texture = SDL_CreateTextureFromSurface(renderer, fly_surface);
     poo_texture = SDL_CreateTextureFromSurface(renderer, poo_surface);
     brush_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
+    flower_texture = SDL_CreateTextureFromSurface(renderer, flower_surface);
 
     SDL_FreeSurface(wall_surface);
     SDL_FreeSurface(wall_window_surface);
+    SDL_FreeSurface(wall_painting_surface);
     SDL_FreeSurface(fly_surface);
     SDL_FreeSurface(poo_surface);
     SDL_FreeSurface(brush_surface);
+    SDL_FreeSurface(flower_surface);
 
     if (wall_texture == NULL || fly_texture == NULL || poo_texture == NULL || brush_surface == NULL || wall_window_surface == NULL) {
         fprintf(stderr, "Failed to create a texture: %s\n", SDL_GetError());
@@ -253,9 +272,11 @@ int main(int argc, char *argv[]) {
 
     SDL_DestroyTexture(wall_texture);
     SDL_DestroyTexture(wall_window_texture);
+    SDL_DestroyTexture(wall_painting_texture);
     SDL_DestroyTexture(poo_texture);
     SDL_DestroyTexture(fly_texture);
     SDL_DestroyTexture(brush_texture);
+    SDL_DestroyTexture(flower_texture);
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
@@ -583,6 +604,15 @@ void fly_update(Sprite *sprite, Uint32 elapsed_time) {
     }
 }
 
+void init_flower(Sprite *sprite, int x, int y) {
+    *sprite = (typeof(*sprite)) {
+        .texture = flower_texture,
+        .x = x + 0.5,
+        .y = y + 0.5,
+        .is_harmless = true,
+        .is_visible = true,
+    };
+}
 
 void update_sprites(Uint32 elapsed_time) {
     for (int i = 0; i < num_sprites; i++) {
@@ -739,6 +769,14 @@ void load_map(const char *filename) {
                     goto too_many_sprites;
                 }
                 init_fly(&sprites[num_sprites], x, y);
+                num_sprites++;
+                map[y][x] = ' ';
+                break;
+            case '*':
+                if (num_sprites >= MAX_SPRITES) {
+                    goto too_many_sprites;
+                }
+                init_flower(&sprites[num_sprites], x, y);
                 num_sprites++;
                 map[y][x] = ' ';
                 break;
