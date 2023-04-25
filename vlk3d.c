@@ -47,16 +47,7 @@ typedef enum {
 #define PLAYER_ROTATION_SPEED 0.05
 #define PLAYER_MOVEMENT_SPEED 0.1
 
-typedef struct Projectile {
-    Vector2 position;
-    Vector2 direction;
-    struct Projectile *next;
-} Projectile;
-
 #define PROJECTILE_SPEED 0.003f
-#define PROJECTILE_COLOR_R 255
-#define PROJECTILE_COLOR_G 0
-#define PROJECTILE_COLOR_B 0
 
 int line_height_buffer[RAY_COUNT] = {0};
 
@@ -69,8 +60,6 @@ SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
 
 /* Game state */
-
-Projectile *projectiles = NULL;
 
 int **map;
 int map_width;
@@ -90,6 +79,9 @@ struct Sprite {
     bool is_harmless;
     void (*update) (Sprite *Sprite, Uint32 elapsed_time);
     void (*hit) (Sprite *Sprite);
+
+    float distance_to_player;
+    float angle_to_player;
 };
 
 #define MAX_SPRITES 50
@@ -101,13 +93,12 @@ int num_sprites = 0;
 
 game_result_t game_loop(SDL_Renderer *renderer);
 void handle_events(SDL_Event *event, bool *is_running);
-void render(SDL_Renderer *renderer);
+void render_walls(SDL_Renderer *renderer);
 float cast_ray(float angle);
 bool is_wall_collision(float x, float y);
 bool is_horizontal_wall(Vector2 position);
 bool is_close_to_enemy(float x, float y);
 bool has_no_things_to_do();
-bool should_render(Sprite *sprite);
 
 void init_poo(Sprite *sprite, int x, int y);
 void poo_hit(Sprite *sprite);
@@ -121,7 +112,6 @@ void projectile_update(Sprite *sprite, Uint32 elapsed_time);
 
 void update_sprites(Uint32 elapsed_time);
 
-void render_projectiles(SDL_Renderer *renderer);
 void render_sprites(SDL_Renderer *renderer);
 void fire_projectile(void);
 void free_map(void);
@@ -287,8 +277,7 @@ game_result_t game_loop(SDL_Renderer *renderer) {
 
         update_sprites(elapsed_time);
 
-        render(renderer);
-        render_projectiles(renderer);
+        render_walls(renderer);
         render_sprites(renderer);
 
         SDL_RenderPresent(renderer);
@@ -310,18 +299,18 @@ void handle_events(SDL_Event *event, bool *is_running) {
         } else if (event->key.keysym.sym == SDLK_SPACE) {
             fire_projectile();
         } else if (event->key.keysym.sym == SDLK_UP) {
-            float newX = player.x + cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            float newY = player.y + sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            if (!is_wall_collision(newX, newY)) {
-                player.x = newX;
-                player.y = newY;
+            float new_x = player.x + cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
+            float new_y = player.y + sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
+            if (!is_wall_collision(new_x, new_y)) {
+                player.x = new_x;
+                player.y = new_y;
             }
         } else if (event->key.keysym.sym == SDLK_DOWN) {
-            float newX = player.x - cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            float newY = player.y - sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            if (!is_wall_collision(newX, newY)) {
-                player.x = newX;
-                player.y = newY;
+            float new_x = player.x - cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
+            float new_y = player.y - sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
+            if (!is_wall_collision(new_x, new_y)) {
+                player.x = new_x;
+                player.y = new_y;
             }
         } else if (event->key.keysym.sym == SDLK_LEFT) {
             player.direction -= PLAYER_ROTATION_SPEED;
@@ -342,7 +331,7 @@ void handle_events(SDL_Event *event, bool *is_running) {
     }
 }
 
-void render(SDL_Renderer *renderer) {
+void render_walls(SDL_Renderer *renderer) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
@@ -439,6 +428,9 @@ bool is_horizontal_wall(Vector2 position) {
 
 bool is_close_to_enemy(float x, float y) {
     for (int i = 0; i < num_sprites; i++) {
+        if (!sprites[i].is_visible) {
+            continue;
+        }
         float distance = sqrtf(powf(x - sprites[i].x, 2) + powf(y - sprites[i].y, 2));
         if (distance < ENEMY_PROXIMITY_DISTANCE && !sprites[i].is_harmless) {
             return true;
@@ -454,10 +446,6 @@ bool has_no_things_to_do() {
         }
     }
     return true;
-}
-
-bool should_render(Sprite *sprite) {
-    return sprite->is_visible;
 }
 
 void init_poo(Sprite *sprite, int x, int y) {
@@ -500,16 +488,13 @@ void init_projectile(Sprite *sprite) {
         .texture = brush_texture,
         .is_visible = false,
         .is_harmless = true,
-        .hit_distance = 100,
+        .hit_distance = 1000,
         .update = projectile_update
     };
 
 }
 
 void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
-    if (!projectile->is_visible)
-        return;
-
     float dx = projectile->direction.x * PROJECTILE_SPEED * elapsed_time;
     float dy = projectile->direction.y * PROJECTILE_SPEED * elapsed_time;
 
@@ -523,6 +508,9 @@ void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
 
     /* check all other sprites but skip the first one - itself */
     for (int j = 1; j < num_sprites; j++) {
+        if (!sprites[j].is_visible) {
+            continue;
+        }
         float dist_x = sprites[j].x - projectile->x;
         float dist_y = sprites[j].y - projectile->y;
         float distance = sqrtf(dist_x * dist_x + dist_y * dist_y);
@@ -534,7 +522,6 @@ void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
         }
     }
 }
-
 
 float random_float(float min, float max) {
     float scale = rand() / (float) RAND_MAX;
@@ -573,74 +560,68 @@ void fly_update(Sprite *sprite, Uint32 elapsed_time) {
 
 void update_sprites(Uint32 elapsed_time) {
     for (int i = 0; i < num_sprites; i++) {
+        if (!sprites[i].is_visible)
+            continue;
+
         void (*update_function) = sprites[i].update;
         if (update_function)
             sprites[i].update(&sprites[i], elapsed_time);
     }
 }
 
-void render_projectiles(SDL_Renderer *renderer) {
-    Projectile *current = projectiles;
-
-    while (current != NULL) {
-        float angle = atan2f(current->position.y - player.y, current->position.x - player.x);
-        if (angle < 0) {
-            angle += 2 * M_PI;
-        }
-        float distance_to_projectile = sqrtf(powf(current->position.x - player.x, 2) + powf(current->position.y - player.y, 2));
-        float relative_angle = player.direction - angle;
-
-        // Check if the projectile is in the player's field of view
-        if (relative_angle > -FOV / 2.0 && relative_angle < FOV / 2.0) {
-            int line_height = (int)(WINDOW_HEIGHT / distance_to_projectile);
-
-            // Calculate the horizontal position of the projectile on the screen
-            int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
-
-            // Calculate the size of the projectile square, taking perspective into account
-            int square_size = (int)(line_height * 0.2);
-
-            // Set the color and render the projectile as a square
-            SDL_SetRenderDrawColor(renderer, PROJECTILE_COLOR_R, PROJECTILE_COLOR_G, PROJECTILE_COLOR_B, 255);
-            SDL_Rect square = {screen_x - square_size / 2, (WINDOW_HEIGHT - line_height) / 2 + (line_height - square_size) / 2, square_size, square_size};
-            SDL_RenderFillRect(renderer, &square);
-        }
-
-        current = current->next;
-    }
+int compare_sprites_by_distance(const void *left, const void *right) {
+    return ((Sprite *)left)->distance_to_player < ((Sprite *)right)->distance_to_player ? -1 : 1;
 }
 
 void render_sprites(SDL_Renderer *renderer) {
+    /* Collect sprites that are visible and qsort them based on line height (aka
+     * distance). This'll solve the sprite overlapping problem. */
+
+    Sprite *sprites_visible[MAX_SPRITES] = {0};
+    int num_sprites_visible = 0;
     for (int i = 0; i < num_sprites; i++) {
-        /* check if the sprite should be rendered at all  */
-        if (!should_render(&sprites[i])) {
+        if (!sprites[i].is_visible) {
             continue;
         }
 
-        /* Angle between a player space positive x-axis and enemy's positiion */
+        /* Angle between a player space positive x-axis and sprite positiion */
         float angle = atan2f(sprites[i].y - player.y, sprites[i].x - player.x);
 
-        /* Find the angle between player's direction vector and the enemy and
+        /* Find the angle between player's direction vector and the sprite and
          * normalize it */
         float relative_angle = player.direction - angle;
         if (relative_angle > M_PI) {
             relative_angle -= 2 * M_PI;
         }
 
-        /* Check if the enemy is in the player's field of view */
+        /* Check if the sprite is in the player's field of view */
         if (relative_angle < -FOV / 2.0 || relative_angle > FOV / 2.0) {
             continue;
         }
 
         /* Distance and fisheye effect correction */
-        float distance_to_enemy = sqrtf(powf(sprites[i].x - player.x, 2) + powf(sprites[i].y - player.y, 2));
-        distance_to_enemy *= cosf(relative_angle);
+        float distance_to_sprite = sqrtf(powf(sprites[i].x - player.x, 2) + powf(sprites[i].y - player.y, 2));
+        distance_to_sprite *= cosf(relative_angle);
 
-        /* Sprite line height based on the distance to the enemy  */
-        int line_height = (int)(WINDOW_HEIGHT / distance_to_enemy);
+        sprites_visible[num_sprites_visible] = &sprites[i];
+        sprites_visible[num_sprites_visible]->distance_to_player = distance_to_sprite;
+        sprites_visible[num_sprites_visible]->angle_to_player = relative_angle;
+
+        num_sprites_visible++;
+    }
+
+    /* Now, sort the array based on distance to the player */
+    qsort(sprites_visible, num_sprites_visible, sizeof(Sprite *), compare_sprites_by_distance);
+
+    /* Go through visible sprites and draw them */
+    for (int i = 0; i < num_sprites_visible; i++) {
+        Sprite *sprite = sprites_visible[i];
+
+        /* Sprite line height based on the distance to the player  */
+        int line_height = (int)(WINDOW_HEIGHT / sprite->distance_to_player);
 
         /* Calculate the horizontal position of the enemy on the screen */
-        int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(relative_angle) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
+        int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(sprite->angle_to_player) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
 
         /* Calculate the size of the sprite */
         const int sprite_size = (int)(line_height);
@@ -667,7 +648,7 @@ void render_sprites(SDL_Renderer *renderer) {
             SDL_Rect dest_rect = {(screen_x - sprite_size / 2) + col, (WINDOW_HEIGHT - sprite_size) / 2, 1, sprite_size};
 
             /* Render the current column of the texture */
-            SDL_RenderCopyEx(renderer, sprites[i].texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
+            SDL_RenderCopyEx(renderer, sprite->texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
         }
     }
 }
@@ -696,101 +677,101 @@ void load_map(const char *filename) {
 
     /* the first sprite is always the projectile */
     init_projectile(&sprites[0]);
-    num_sprites = 1;
+    num_sprites++;
 
     for (int y = 0; y < map_height; y++) {
         map[y] = (int *)malloc(map_width * sizeof(int));
-        for (int x = 0; x < map_width; x++) {
-            fscanf(file, "%1d", &map[y][x]);
+            for (int x = 0; x < map_width; x++) {
+                fscanf(file, "%1d", &map[y][x]);
 
-            if (map[y][x] == 9) {
-                player.x = x + 0.5;
-                player.y = y + 0.5;
-                map[y][x] = 0;
-                player_start_found = true;
-            } else if (map[y][x] == 2) {
-                if (num_sprites >= MAX_SPRITES) {
-                    fprintf(stderr, "No starting position found in the map file: %s\n", filename);
-                    exit(1);
+                if (map[y][x] == 9) {
+                    player.x = x + 0.5;
+                    player.y = y + 0.5;
+                    map[y][x] = 0;
+                    player_start_found = true;
+                } else if (map[y][x] == 2) {
+                    if (num_sprites >= MAX_SPRITES) {
+                        fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+                        exit(1);
+                    }
+                    init_poo(&sprites[num_sprites], x, y);;
+                    num_sprites++;
+                    map[y][x] = 0;
+                } else if (map[y][x] == 3) {
+                    if (num_sprites >= MAX_SPRITES) {
+                        fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+                        exit(1);
+                    }
+                    init_fly(&sprites[num_sprites], x, y);;
+                    num_sprites++;
+                    map[y][x] = 0;
                 }
-                init_poo(&sprites[num_sprites], x, y);;
-                num_sprites++;
-                map[y][x] = 0;
-            } else if (map[y][x] == 3) {
-                if (num_sprites >= MAX_SPRITES) {
-                    fprintf(stderr, "No starting position found in the map file: %s\n", filename);
-                    exit(1);
-                }
-                init_fly(&sprites[num_sprites], x, y);;
-                num_sprites++;
-                map[y][x] = 0;
+
             }
+        }
 
+        if (!player_start_found) {
+            fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+            exit(1);
+        }
+
+        fclose(file);
+    }
+
+    void free_map(void) {
+        for (int y = 0; y < map_height; y++) {
+            free(map[y]);
+        }
+        free(map);
+    }
+
+    void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y) {
+        SDL_Surface *text_surface = TTF_RenderText_Blended(font, message, color);
+        SDL_Surface *outline_surface = TTF_RenderText_Blended(font, message, outline_color);
+
+        SDL_Rect offset;
+        offset.x = -1;
+        offset.y = -1;
+        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+        offset.x = 1;
+        offset.y = -1;
+        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+        offset.x = -1;
+        offset.y = 1;
+        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+        offset.x = 1;
+        offset.y = 1;
+        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+
+        SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+
+        SDL_Rect dest;
+        dest.x = x;
+        dest.y = y;
+        dest.w = text_surface->w;
+        dest.h = text_surface->h;
+
+        SDL_RenderCopy(renderer, text_texture, NULL, &dest);
+        SDL_FreeSurface(text_surface);
+        SDL_FreeSurface(outline_surface);
+        SDL_DestroyTexture(text_texture);
+    }
+
+
+    void wait_for_key_press() {
+        SDL_Event event;
+        bool is_running = true;
+        while (is_running) {
+            SDL_PollEvent(&event);
+            switch (event.type) {
+            case SDL_QUIT:
+                is_running = false;
+                break;
+            case SDL_KEYDOWN:
+                is_running = false;
+                break;
+            default:
+                break;
+            }
         }
     }
-
-    if (!player_start_found) {
-        fprintf(stderr, "No starting position found in the map file: %s\n", filename);
-        exit(1);
-    }
-
-    fclose(file);
-}
-
-void free_map(void) {
-    for (int y = 0; y < map_height; y++) {
-        free(map[y]);
-    }
-    free(map);
-}
-
-void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y) {
-    SDL_Surface *text_surface = TTF_RenderText_Blended(font, message, color);
-    SDL_Surface *outline_surface = TTF_RenderText_Blended(font, message, outline_color);
-
-    SDL_Rect offset;
-    offset.x = -1;
-    offset.y = -1;
-    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-    offset.x = 1;
-    offset.y = -1;
-    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-    offset.x = -1;
-    offset.y = 1;
-    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-    offset.x = 1;
-    offset.y = 1;
-    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-
-    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-
-    SDL_Rect dest;
-    dest.x = x;
-    dest.y = y;
-    dest.w = text_surface->w;
-    dest.h = text_surface->h;
-
-    SDL_RenderCopy(renderer, text_texture, NULL, &dest);
-    SDL_FreeSurface(text_surface);
-    SDL_FreeSurface(outline_surface);
-    SDL_DestroyTexture(text_texture);
-}
-
-
-void wait_for_key_press() {
-    SDL_Event event;
-    bool is_running = true;
-    while (is_running) {
-        SDL_PollEvent(&event);
-        switch (event.type) {
-        case SDL_QUIT:
-            is_running = false;
-            break;
-        case SDL_KEYDOWN:
-            is_running = false;
-            break;
-        default:
-            break;
-        }
-    }
-}
