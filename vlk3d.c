@@ -55,6 +55,7 @@ int line_height_buffer[RAY_COUNT] = {0};
 #define TEXTURE_HEIGHT 128
 
 SDL_Texture *wall_texture = NULL;
+SDL_Texture *wall_window_texture = NULL;
 SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
@@ -95,6 +96,8 @@ game_result_t game_loop(SDL_Renderer *renderer);
 void handle_events(SDL_Event *event, bool *is_running);
 void render_walls(SDL_Renderer *renderer);
 float cast_ray(float angle);
+bool is_wall(int x, int y);
+bool is_within_bounds(int x, int y) ;
 bool is_wall_collision(float x, float y);
 bool is_horizontal_wall(Vector2 position);
 bool is_close_to_enemy(float x, float y);
@@ -184,11 +187,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Surface *wall_surface = IMG_Load("wallpaper.png");
+    SDL_Surface *wall_surface = IMG_Load("wall.png");
+    SDL_Surface *wall_window_surface = IMG_Load("wall_with_window.png");
     SDL_Surface *fly_surface = IMG_Load("fly.png");
     SDL_Surface *poo_surface = IMG_Load("poo.png");
     SDL_Surface *brush_surface = IMG_Load("brush.png");
-    if (wall_surface == NULL || fly_surface == NULL || poo_surface == NULL || brush_surface == NULL) {
+    if (wall_surface == NULL || fly_surface == NULL || poo_surface == NULL || brush_surface == NULL || wall_window_surface == NULL) {
         fprintf(stderr, "Failed to load a texture: %s\n", IMG_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
@@ -196,16 +200,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
+    wall_window_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
     fly_texture = SDL_CreateTextureFromSurface(renderer, fly_surface);
     poo_texture = SDL_CreateTextureFromSurface(renderer, poo_surface);
     brush_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
 
     SDL_FreeSurface(wall_surface);
+    SDL_FreeSurface(wall_window_surface);
     SDL_FreeSurface(fly_surface);
     SDL_FreeSurface(poo_surface);
     SDL_FreeSurface(brush_surface);
 
-    if (wall_texture == NULL || fly_texture == NULL || poo_texture == NULL) {
+    if (wall_texture == NULL || fly_texture == NULL || poo_texture == NULL || brush_surface == NULL || wall_window_surface == NULL) {
         fprintf(stderr, "Failed to create a texture: %s\n", SDL_GetError());
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
@@ -241,6 +247,7 @@ int main(int argc, char *argv[]) {
     Mix_CloseAudio();
 
     SDL_DestroyTexture(wall_texture);
+    SDL_DestroyTexture(wall_window_texture);
     SDL_DestroyTexture(poo_texture);
     SDL_DestroyTexture(fly_texture);
     SDL_DestroyTexture(brush_texture);
@@ -387,6 +394,14 @@ void render_walls(SDL_Renderer *renderer) {
     }
 }
 
+bool is_wall(int x, int y) {
+    return isdigit(map[y][x]);
+}
+
+bool is_within_bounds(int x, int y) {
+    return x >= 0 && x < map_width && y >= 0 && y < map_height;
+}
+
 float cast_ray(float angle) {
     Vector2 direction = {cosf(angle), sinf(angle)};
     float distance = 0.0;
@@ -396,10 +411,7 @@ float cast_ray(float angle) {
         position.x += direction.x * RAY_STEP;
         position.y += direction.y * RAY_STEP;
 
-        int map_x = (int)floor(position.x);
-        int map_y = (int)floor(position.y);
-
-        if (map_x >= 0 && map_x < map_width && map_y >= 0 && map_y < map_height && map[map_y][map_x] == '1') {
+        if (is_wall_collision(position.x, position.y)) {
             break;
         }
 
@@ -413,7 +425,7 @@ bool is_wall_collision(float x, float y) {
     int map_x = (int)floor(x);
     int map_y = (int)floor(y);
 
-    if (map_x >= 0 && map_x < map_width && map_y >= 0 && map_y < map_height && map[map_y][map_x] == '1') {
+    if (is_within_bounds(map_x, map_y) && is_wall(map_x, map_y)) {
         return true;
     }
 
