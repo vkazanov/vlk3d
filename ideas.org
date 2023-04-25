@@ -2,6 +2,8 @@ Nika's ideas:
 
 - [X] better projectile
 
+- [X] windows
+
 - [ ] colorful win/lose letters
 
 - [ ] fireworks when winning
@@ -19,8 +21,6 @@ Nika's ideas:
   - [ ] dangerous cat paws
 
   - [ ] flowers to water
-
-- [ ] windows
 
 - [ ] room doors
 
@@ -46,6 +46,9 @@ My ideas:
   - [X] numbers for wall textures
 
   - [X] letters for mosters and other sprites
+
+- [ ] the is_wall_collision function should use both old x/y and delta x/y to figure out
+  whether map_x, map_y changed
 
 - [ ] double buffering for cleaner animated feeling
 

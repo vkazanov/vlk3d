@@ -60,9 +60,14 @@ SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
 
+SDL_Texture **char_to_wall_texture_table[] = {
+    ['1'] = &wall_texture,
+    ['2'] = &wall_window_texture
+};
+
 /* Game state */
 
-char **map;
+    char **map;
 int map_width;
 int map_height;
 
@@ -95,10 +100,10 @@ int num_sprites = 0;
 game_result_t game_loop(SDL_Renderer *renderer);
 void handle_events(SDL_Event *event, bool *is_running);
 void render_walls(SDL_Renderer *renderer);
-float cast_ray(float angle);
+float cast_ray(float angle, char *wall_type);
 bool is_wall(int x, int y);
 bool is_within_bounds(int x, int y) ;
-bool is_wall_collision(float x, float y);
+bool is_wall_collision(float x, float y, char *wall_type);
 bool is_horizontal_wall(Vector2 position);
 bool is_close_to_enemy(float x, float y);
 bool has_no_things_to_do();
@@ -200,7 +205,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
-    wall_window_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
+    wall_window_texture = SDL_CreateTextureFromSurface(renderer, wall_window_surface);
     fly_texture = SDL_CreateTextureFromSurface(renderer, fly_surface);
     poo_texture = SDL_CreateTextureFromSurface(renderer, poo_surface);
     brush_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
@@ -308,14 +313,16 @@ void handle_events(SDL_Event *event, bool *is_running) {
         } else if (event->key.keysym.sym == SDLK_UP) {
             float new_x = player.x + cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float new_y = player.y + sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            if (!is_wall_collision(new_x, new_y)) {
+            char wall_c;
+            if (!is_wall_collision(new_x, new_y, &wall_c)) {
                 player.x = new_x;
                 player.y = new_y;
             }
         } else if (event->key.keysym.sym == SDLK_DOWN) {
             float new_x = player.x - cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float new_y = player.y - sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            if (!is_wall_collision(new_x, new_y)) {
+            char wall_c;
+            if (!is_wall_collision(new_x, new_y, &wall_c)) {
                 player.x = new_x;
                 player.y = new_y;
             }
@@ -358,7 +365,11 @@ void render_walls(SDL_Renderer *renderer) {
 
     for (int i = 0; i < RAY_COUNT; i++) {
         float ray_angle = player.direction - FOV / 2.0 + i * angle_per_ray;
-        float raw_distance = cast_ray(ray_angle);
+        char wall_type;
+        float raw_distance = cast_ray(ray_angle, &wall_type);
+
+        /* use a conversion table to turn wall_type into a texture for drawing */
+        SDL_Texture *texture = *char_to_wall_texture_table[wall_type];
 
         /* Calculate the line height while correcting for the fisheye effect */
         float corrected_distance = raw_distance * cosf(player.direction - ray_angle);
@@ -390,7 +401,7 @@ void render_walls(SDL_Renderer *renderer) {
         SDL_Rect dest_rect = {i * rays_per_column, (WINDOW_HEIGHT - line_height) / 2, rays_per_column, line_height};
 
         /* Render the textured wall */
-        SDL_RenderCopy(renderer, wall_texture, &src_rect, &dest_rect);
+        SDL_RenderCopy(renderer, texture, &src_rect, &dest_rect);
     }
 }
 
@@ -402,7 +413,7 @@ bool is_within_bounds(int x, int y) {
     return x >= 0 && x < map_width && y >= 0 && y < map_height;
 }
 
-float cast_ray(float angle) {
+float cast_ray(float angle, char *wall_type) {
     Vector2 direction = {cosf(angle), sinf(angle)};
     float distance = 0.0;
     Vector2 position = {player.x, player.y};
@@ -411,7 +422,7 @@ float cast_ray(float angle) {
         position.x += direction.x * RAY_STEP;
         position.y += direction.y * RAY_STEP;
 
-        if (is_wall_collision(position.x, position.y)) {
+        if (is_wall_collision(position.x, position.y, wall_type)) {
             break;
         }
 
@@ -421,14 +432,16 @@ float cast_ray(float angle) {
     return distance;
 }
 
-bool is_wall_collision(float x, float y) {
+bool is_wall_collision(float x, float y, char *wall_type) {
     int map_x = (int)floor(x);
     int map_y = (int)floor(y);
 
     if (is_within_bounds(map_x, map_y) && is_wall(map_x, map_y)) {
+        *wall_type = map[map_y][map_x];
         return true;
     }
 
+    *wall_type = '\0';
     return false;
 }
 
@@ -513,7 +526,8 @@ void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
     projectile->x += dx;
     projectile->y += dy;
 
-    if (is_wall_collision(projectile->x, projectile->y)) {
+    char wall_type;
+    if (is_wall_collision(projectile->x, projectile->y, &wall_type)) {
         projectile->is_visible = false;
         return;
     }
