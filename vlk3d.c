@@ -57,6 +57,7 @@ int line_height_buffer[RAY_COUNT] = {0};
 SDL_Texture *wall_texture = NULL;
 SDL_Texture *wall_window_texture = NULL;
 SDL_Texture *wall_painting_texture = NULL;
+SDL_Texture *wall_door_texture = NULL;
 SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
@@ -68,6 +69,7 @@ struct {
 } name_to_texture_table[] = {
     { &wall_texture, "wall.png"},
     { &wall_window_texture, "wall_with_window.png"},
+    { &wall_door_texture, "wall_with_door.png"},
     { &wall_painting_texture, "wall_painting.png"},
     { &fly_texture, "fly.png"},
     { &poo_texture, "poo.png"},
@@ -78,7 +80,8 @@ struct {
 SDL_Texture **char_to_wall_texture_table[] = {
     ['1'] = &wall_texture,
     ['2'] = &wall_window_texture,
-    ['3'] = &wall_painting_texture
+    ['3'] = &wall_painting_texture,
+    ['4'] = &wall_door_texture
 };
 
 /* Game state */

@@ -4,6 +4,8 @@ Nika's ideas:
 
 - [X] windows
 
+- [X] room doors
+
 - [ ] colorful win/lose letters
 
 - [ ] fireworks when winning
@@ -21,8 +23,6 @@ Nika's ideas:
   - [ ] dangerous cat paws
 
   - [ ] flowers to water
-
-- [ ] room doors
 
 - [ ] coins
 
@@ -51,6 +51,8 @@ My ideas:
 
 - [ ] the is_wall_collision function should use both old x/y and delta x/y to figure out
   whether map_x, map_y changed
+
+- [ ] simple wall shading wolf3d-style by coloring horizontal/vertical walls differently
 
 - [ ] double buffering for cleaner animated feeling
 
