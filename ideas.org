@@ -41,11 +41,11 @@ My ideas:
 
 - [X] sprites should be draw from furthers to closest
 
-- [ ] nicer map specification
+- [X] nicer map specification
 
-  - [ ] numbers for wall textures
+  - [X] numbers for wall textures
 
-  - [ ] letters for mosters and other sprites
+  - [X] letters for mosters and other sprites
 
 - [ ] double buffering for cleaner animated feeling
 

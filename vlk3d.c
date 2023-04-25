@@ -61,7 +61,7 @@ SDL_Texture *brush_texture = NULL;
 
 /* Game state */
 
-int **map;
+char **map;
 int map_width;
 int map_height;
 
@@ -399,7 +399,7 @@ float cast_ray(float angle) {
         int map_x = (int)floor(position.x);
         int map_y = (int)floor(position.y);
 
-        if (map_x >= 0 && map_x < map_width && map_y >= 0 && map_y < map_height && map[map_y][map_x] == 1) {
+        if (map_x >= 0 && map_x < map_width && map_y >= 0 && map_y < map_height && map[map_y][map_x] == '1') {
             break;
         }
 
@@ -410,10 +410,10 @@ float cast_ray(float angle) {
 }
 
 bool is_wall_collision(float x, float y) {
-    int mapX = (int)floor(x);
-    int mapY = (int)floor(y);
+    int map_x = (int)floor(x);
+    int map_y = (int)floor(y);
 
-    if (mapX >= 0 && mapX < map_width && mapY >= 0 && mapY < map_height && map[mapY][mapX] == 1) {
+    if (map_x >= 0 && map_x < map_width && map_y >= 0 && map_y < map_height && map[map_y][map_x] == '1') {
         return true;
     }
 
@@ -550,7 +550,7 @@ void fly_update(Sprite *sprite, Uint32 elapsed_time) {
 
     if (new_tile_x >= 0 && new_tile_x < map_width &&
         new_tile_y >= 0 && new_tile_y < map_height &&
-        map[new_tile_y][new_tile_x] != 1) {
+        map[new_tile_y][new_tile_x] != '1') {
 
         sprite->x = new_x;
         sprite->y = new_y;
@@ -670,108 +670,126 @@ void load_map(const char *filename) {
         exit(1);
     }
 
-    fscanf(file, "%d %d", &map_width, &map_height);
+    fscanf(file, "%d %d\n", &map_width, &map_height);
 
-    map = (int **)malloc(map_height * sizeof(int *));
-    bool player_start_found = false;
+    map = (char **)malloc(map_height * sizeof(char *));
 
     /* the first sprite is always the projectile */
     init_projectile(&sprites[0]);
     num_sprites++;
 
+    /* need to make sure the player was there */
+    bool player_start_found = false;
+
+    /* walk through all map cells, load the map and all the sprites*/
+    fprintf(stderr, "File: %s\n", filename);
+    fprintf(stderr, "Dimensions: %d x %d\n", map_width, map_height);
+
     for (int y = 0; y < map_height; y++) {
-        map[y] = (int *)malloc(map_width * sizeof(int));
-            for (int x = 0; x < map_width; x++) {
-                fscanf(file, "%1d", &map[y][x]);
+        /* size = width + newline + null */
+        map[y] = malloc(map_width * sizeof(char) + 2);
+        fgets(map[y], map_width * sizeof(char) + 2, file);
+        for (int x = 0; x < map_width; x++) {
+            char c = map[y][x];
+            fprintf(stderr, "%c", c);
 
-                if (map[y][x] == 9) {
-                    player.x = x + 0.5;
-                    player.y = y + 0.5;
-                    map[y][x] = 0;
-                    player_start_found = true;
-                } else if (map[y][x] == 2) {
-                    if (num_sprites >= MAX_SPRITES) {
-                        fprintf(stderr, "No starting position found in the map file: %s\n", filename);
-                        exit(1);
-                    }
-                    init_poo(&sprites[num_sprites], x, y);;
-                    num_sprites++;
-                    map[y][x] = 0;
-                } else if (map[y][x] == 3) {
-                    if (num_sprites >= MAX_SPRITES) {
-                        fprintf(stderr, "No starting position found in the map file: %s\n", filename);
-                        exit(1);
-                    }
-                    init_fly(&sprites[num_sprites], x, y);;
-                    num_sprites++;
-                    map[y][x] = 0;
-                }
-
-            }
-        }
-
-        if (!player_start_found) {
-            fprintf(stderr, "No starting position found in the map file: %s\n", filename);
-            exit(1);
-        }
-
-        fclose(file);
-    }
-
-    void free_map(void) {
-        for (int y = 0; y < map_height; y++) {
-            free(map[y]);
-        }
-        free(map);
-    }
-
-    void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y) {
-        SDL_Surface *text_surface = TTF_RenderText_Blended(font, message, color);
-        SDL_Surface *outline_surface = TTF_RenderText_Blended(font, message, outline_color);
-
-        SDL_Rect offset;
-        offset.x = -1;
-        offset.y = -1;
-        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-        offset.x = 1;
-        offset.y = -1;
-        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-        offset.x = -1;
-        offset.y = 1;
-        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-        offset.x = 1;
-        offset.y = 1;
-        SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
-
-        SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
-
-        SDL_Rect dest;
-        dest.x = x;
-        dest.y = y;
-        dest.w = text_surface->w;
-        dest.h = text_surface->h;
-
-        SDL_RenderCopy(renderer, text_texture, NULL, &dest);
-        SDL_FreeSurface(text_surface);
-        SDL_FreeSurface(outline_surface);
-        SDL_DestroyTexture(text_texture);
-    }
-
-
-    void wait_for_key_press() {
-        SDL_Event event;
-        bool is_running = true;
-        while (is_running) {
-            SDL_PollEvent(&event);
-            switch (event.type) {
-            case SDL_QUIT:
-                is_running = false;
+            switch (c) {
+            case '@':
+                player.x = x + 0.5;
+                player.y = y + 0.5;
+                map[y][x] = ' ';
+                player_start_found = true;
                 break;
-            case SDL_KEYDOWN:
-                is_running = false;
+            case 'p':
+                if (num_sprites >= MAX_SPRITES) {
+                    goto too_many_sprites;
+                }
+                init_poo(&sprites[num_sprites], x, y);
+                num_sprites++;
+                map[y][x] = ' ';
+                break;
+            case 'f':
+                if (num_sprites >= MAX_SPRITES) {
+                    goto too_many_sprites;
+                }
+                init_fly(&sprites[num_sprites], x, y);
+                num_sprites++;
+                map[y][x] = ' ';
                 break;
             default:
-                break;
+                continue;
             }
         }
+        fprintf(stderr, "\n");
     }
+
+    if (!player_start_found) {
+        fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+        exit(1);
+    }
+
+    fclose(file);
+    return;
+
+too_many_sprites:
+    fprintf(stderr, "No starting position found in the map file: %s\n", filename);
+    exit(1);
+}
+
+void free_map(void) {
+    for (int y = 0; y < map_height; y++) {
+        free(map[y]);
+    }
+    free(map);
+}
+
+void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y) {
+    SDL_Surface *text_surface = TTF_RenderText_Blended(font, message, color);
+    SDL_Surface *outline_surface = TTF_RenderText_Blended(font, message, outline_color);
+
+    SDL_Rect offset;
+    offset.x = -1;
+    offset.y = -1;
+    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+    offset.x = 1;
+    offset.y = -1;
+    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+    offset.x = -1;
+    offset.y = 1;
+    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+    offset.x = 1;
+    offset.y = 1;
+    SDL_BlitSurface(outline_surface, NULL, text_surface, &offset);
+
+    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+
+    SDL_Rect dest;
+    dest.x = x;
+    dest.y = y;
+    dest.w = text_surface->w;
+    dest.h = text_surface->h;
+
+    SDL_RenderCopy(renderer, text_texture, NULL, &dest);
+    SDL_FreeSurface(text_surface);
+    SDL_FreeSurface(outline_surface);
+    SDL_DestroyTexture(text_texture);
+}
+
+
+void wait_for_key_press() {
+    SDL_Event event;
+    bool is_running = true;
+    while (is_running) {
+        SDL_PollEvent(&event);
+        switch (event.type) {
+        case SDL_QUIT:
+            is_running = false;
+            break;
+        case SDL_KEYDOWN:
+            is_running = false;
+            break;
+        default:
+            break;
+        }
+    }
+}
