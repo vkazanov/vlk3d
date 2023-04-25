@@ -132,6 +132,9 @@ void load_map(const char *filename);
 void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y);
 void wait_for_key_press();
 
+void load_textures(SDL_Renderer *renderer);
+void free_textures(void);
+
 int main(int argc, char *argv[]) {
     srand(time(NULL));
 
@@ -197,55 +200,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Surface *wall_surface = IMG_Load("wall.png");
-    SDL_Surface *wall_window_surface = IMG_Load("wall_with_window.png");
-    SDL_Surface *wall_painting_surface = IMG_Load("wall_painting.png");
-    SDL_Surface *fly_surface = IMG_Load("fly.png");
-    SDL_Surface *poo_surface = IMG_Load("poo.png");
-    SDL_Surface *brush_surface = IMG_Load("brush.png");
-    SDL_Surface *flower_surface = IMG_Load("flower.png");
-    if (
-        wall_surface == NULL ||
-        fly_surface == NULL ||
-        poo_surface == NULL ||
-        brush_surface == NULL ||
-        wall_window_surface == NULL ||
-        flower_surface == NULL ||
-        wall_painting_surface == NULL
-    ) {
-        fprintf(stderr, "Failed to load a texture: %s\n", IMG_GetError());
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
-    wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
-    wall_window_texture = SDL_CreateTextureFromSurface(renderer, wall_window_surface);
-    wall_painting_texture = SDL_CreateTextureFromSurface(renderer, wall_painting_surface);
-    fly_texture = SDL_CreateTextureFromSurface(renderer, fly_surface);
-    poo_texture = SDL_CreateTextureFromSurface(renderer, poo_surface);
-    brush_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
-    flower_texture = SDL_CreateTextureFromSurface(renderer, flower_surface);
-
-    SDL_FreeSurface(wall_surface);
-    SDL_FreeSurface(wall_window_surface);
-    SDL_FreeSurface(wall_painting_surface);
-    SDL_FreeSurface(fly_surface);
-    SDL_FreeSurface(poo_surface);
-    SDL_FreeSurface(brush_surface);
-    SDL_FreeSurface(flower_surface);
-
-    if (wall_texture == NULL || fly_texture == NULL || poo_texture == NULL || brush_surface == NULL || wall_window_surface == NULL) {
-        fprintf(stderr, "Failed to create a texture: %s\n", SDL_GetError());
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-        return 1;
-    }
-
-    Mix_PlayMusic(music, -1);
-
+    load_textures(renderer);
     load_map("map.txt");
+    Mix_PlayMusic(music, -1);
 
     SDL_Color white = {255, 255, 255, 255};
     SDL_Color black = {0, 0, 0, 255}; // New outline color
@@ -270,13 +227,7 @@ int main(int argc, char *argv[]) {
     Mix_FreeMusic(music);
     Mix_CloseAudio();
 
-    SDL_DestroyTexture(wall_texture);
-    SDL_DestroyTexture(wall_window_texture);
-    SDL_DestroyTexture(wall_painting_texture);
-    SDL_DestroyTexture(poo_texture);
-    SDL_DestroyTexture(fly_texture);
-    SDL_DestroyTexture(brush_texture);
-    SDL_DestroyTexture(flower_texture);
+    free_textures();
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
@@ -856,4 +807,56 @@ void wait_for_key_press() {
             break;
         }
     }
+}
+
+void load_textures(SDL_Renderer *renderer) {
+    SDL_Surface *wall_surface = IMG_Load("wall.png");
+    SDL_Surface *wall_window_surface = IMG_Load("wall_with_window.png");
+    SDL_Surface *wall_painting_surface = IMG_Load("wall_painting.png");
+    SDL_Surface *fly_surface = IMG_Load("fly.png");
+    SDL_Surface *poo_surface = IMG_Load("poo.png");
+    SDL_Surface *brush_surface = IMG_Load("brush.png");
+    SDL_Surface *flower_surface = IMG_Load("flower.png");
+    if (
+        wall_surface == NULL ||
+        fly_surface == NULL ||
+        poo_surface == NULL ||
+        brush_surface == NULL ||
+        wall_window_surface == NULL ||
+        flower_surface == NULL ||
+        wall_painting_surface == NULL
+    ) {
+        fprintf(stderr, "Failed to load a texture: %s\n", IMG_GetError());
+        exit(1);
+    }
+    wall_texture = SDL_CreateTextureFromSurface(renderer, wall_surface);
+    wall_window_texture = SDL_CreateTextureFromSurface(renderer, wall_window_surface);
+    wall_painting_texture = SDL_CreateTextureFromSurface(renderer, wall_painting_surface);
+    fly_texture = SDL_CreateTextureFromSurface(renderer, fly_surface);
+    poo_texture = SDL_CreateTextureFromSurface(renderer, poo_surface);
+    brush_texture = SDL_CreateTextureFromSurface(renderer, brush_surface);
+    flower_texture = SDL_CreateTextureFromSurface(renderer, flower_surface);
+
+    SDL_FreeSurface(wall_surface);
+    SDL_FreeSurface(wall_window_surface);
+    SDL_FreeSurface(wall_painting_surface);
+    SDL_FreeSurface(fly_surface);
+    SDL_FreeSurface(poo_surface);
+    SDL_FreeSurface(brush_surface);
+    SDL_FreeSurface(flower_surface);
+
+    if (wall_texture == NULL || fly_texture == NULL || poo_texture == NULL || brush_surface == NULL || wall_window_surface == NULL) {
+        fprintf(stderr, "Failed to create a texture: %s\n", SDL_GetError());
+        exit(1);
+    }
+}
+
+void free_textures(void) {
+    SDL_DestroyTexture(wall_texture);
+    SDL_DestroyTexture(wall_window_texture);
+    SDL_DestroyTexture(wall_painting_texture);
+    SDL_DestroyTexture(poo_texture);
+    SDL_DestroyTexture(fly_texture);
+    SDL_DestroyTexture(brush_texture);
+    SDL_DestroyTexture(flower_texture);
 }
