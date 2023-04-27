@@ -77,11 +77,12 @@ struct {
     { &flower_texture, "flower.png"},
 };
 
-SDL_Texture **char_to_wall_texture_table[] = {
+SDL_Texture **char_to_texture_table[] = {
     ['1'] = &wall_texture,
     ['2'] = &wall_window_texture,
     ['3'] = &wall_painting_texture,
-    ['4'] = &wall_door_texture
+    ['-'] = &wall_door_texture,
+    ['|'] = &wall_door_texture
 };
 
 /* Game state */
@@ -119,10 +120,12 @@ int num_sprites = 0;
 game_result_t game_loop(SDL_Renderer *renderer);
 void handle_events(SDL_Event *event, bool *is_running);
 void render_walls(SDL_Renderer *renderer);
-float cast_ray(float angle, char *wall_type);
+float cast_ray(float angle, char *wall_type, float *tex_offset) ;
 bool is_wall(int x, int y);
 bool is_within_bounds(int x, int y) ;
-bool is_wall_collision(float x, float y, char *wall_type);
+bool is_collision(float prev_x, float prev_y, float x, float y);
+bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset);
+bool is_wall_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset);
 bool is_horizontal_wall(Vector2 position);
 bool is_close_to_enemy(float x, float y);
 bool has_no_things_to_do();
@@ -301,16 +304,14 @@ void handle_events(SDL_Event *event, bool *is_running) {
         } else if (event->key.keysym.sym == SDLK_UP) {
             float new_x = player.x + cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float new_y = player.y + sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            char wall_c;
-            if (!is_wall_collision(new_x, new_y, &wall_c)) {
+            if (!is_collision(player.x, player.y, new_x, new_y)) {
                 player.x = new_x;
                 player.y = new_y;
             }
         } else if (event->key.keysym.sym == SDLK_DOWN) {
             float new_x = player.x - cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float new_y = player.y - sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            char wall_c;
-            if (!is_wall_collision(new_x, new_y, &wall_c)) {
+            if (!is_collision(player.x, player.y, new_x, new_y)) {
                 player.x = new_x;
                 player.y = new_y;
             }
@@ -354,10 +355,12 @@ void render_walls(SDL_Renderer *renderer) {
     for (int i = 0; i < RAY_COUNT; i++) {
         float ray_angle = player.direction - FOV / 2.0 + i * angle_per_ray;
         char wall_type;
-        float raw_distance = cast_ray(ray_angle, &wall_type);
+        float tex_offset;
+
+        float raw_distance = cast_ray(ray_angle, &wall_type, &tex_offset);
 
         /* use a conversion table to turn wall_type into a texture for drawing */
-        SDL_Texture *texture = *char_to_wall_texture_table[wall_type];
+        SDL_Texture *texture = *char_to_texture_table[wall_type];
 
         /* Calculate the line height while correcting for the fisheye effect */
         float corrected_distance = raw_distance * cosf(player.direction - ray_angle);
@@ -366,22 +369,8 @@ void render_walls(SDL_Renderer *renderer) {
         /* Save line height in a depth buffer to use in in sprite rendering */
         line_height_buffer[i] = line_height;
 
-        /* Calculate the direction vector */
-        Vector2 direction = {cosf(ray_angle), sinf(ray_angle)};
-
-        /* Calculate the coordinate within a texture (0.0 ... 1.0) */
-        Vector2 hit_position = {player.x + direction.x * raw_distance, player.y + direction.y * raw_distance};
-        float tex_x;            /* texture coordinate */
-        if (is_horizontal_wall(hit_position)) {
-            /* A horizontal wall */
-            tex_x = hit_position.x - floor(hit_position.x);
-        } else {
-            /* A vertical wall */
-            tex_x = hit_position.y - floor(hit_position.y);
-        }
-
         /* Set the source rectangle for the texture */
-        int tex_rect_x = (int)(tex_x * (float)TEXTURE_WIDTH);
+        int tex_rect_x = (int)(tex_offset * (float)TEXTURE_WIDTH);
         int tex_rect_y = 0;
         SDL_Rect src_rect = {tex_rect_x, tex_rect_y, 1, TEXTURE_HEIGHT};
 
@@ -393,6 +382,7 @@ void render_walls(SDL_Renderer *renderer) {
     }
 }
 
+/* check if the tile at x, y is a wall */
 bool is_wall(int x, int y) {
     return isdigit(map[y][x]);
 }
@@ -401,18 +391,25 @@ bool is_within_bounds(int x, int y) {
     return x >= 0 && x < map_width && y >= 0 && y < map_height;
 }
 
-float cast_ray(float angle, char *wall_type) {
+float cast_ray(float angle, char *wall_type, float *tex_offset) {
     Vector2 direction = {cosf(angle), sinf(angle)};
     float distance = 0.0;
     Vector2 position = {player.x, player.y};
 
     while (distance < MAX_DISTANCE) {
-        position.x += direction.x * RAY_STEP;
-        position.y += direction.y * RAY_STEP;
+        float new_x = position.x + direction.x * RAY_STEP;
+        float new_y = position.y + direction.y * RAY_STEP;
 
-        if (is_wall_collision(position.x, position.y, wall_type)) {
+        if (is_wall_collision(position.x, position.y, new_x, new_y, wall_type, tex_offset)) {
             break;
         }
+
+        if (is_door_collision(position.x, position.y, new_x, new_y, wall_type, tex_offset)) {
+            break;
+        }
+
+        position.x = new_x;
+        position.y = new_y;
 
         distance += RAY_STEP;
     }
@@ -420,23 +417,76 @@ float cast_ray(float angle, char *wall_type) {
     return distance;
 }
 
-bool is_wall_collision(float x, float y, char *wall_type) {
+bool is_collision(float prev_x, float prev_y, float x, float y) {
+    char wall_type = '\0';
+    float offset = 0.0f;
+    return is_wall_collision(prev_x, prev_y, x, y, &wall_type, &offset) ||
+        is_door_collision(prev_x, prev_y, x, y, &wall_type, &offset);
+}
+
+bool is_door(int map_x, int map_y) {
+    char c = map[map_y][map_x];
+    return c == '-' || c == '|';
+}
+
+bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset) {
     int map_x = (int)floor(x);
     int map_y = (int)floor(y);
 
-    if (is_within_bounds(map_x, map_y) && is_wall(map_x, map_y)) {
-        *wall_type = map[map_y][map_x];
-        return true;
+    /* check if the tile is right */
+    if (!is_door(map_x, map_y)) {
+        return false;
     }
 
-    *wall_type = '\0';
+    *wall_type = map[map_y][map_x];
+
+    /* horisontal door */
+    if (map[map_y][map_x] == '-') {
+        float y_diff = fabs(fabs(roundf(y) - y) - 0.5);
+        if (y_diff < 0.02f) {
+            *tex_offset = x - floorf(x);
+            return true;
+        }
+    }
+
+    /* if vertical door */
+    if (map[map_y][map_x] == '|') {
+        float x_diff = fabs(fabs(roundf(x) - x) - 0.5);
+        if (x_diff < 0.02f) {
+            *tex_offset = y - floorf(y);
+            return true;
+        }
+    }
+
+    /* unreachable */
     return false;
 }
 
-bool is_horizontal_wall(Vector2 position) {
-    /* Just check coordinates to see if the point is on a horizontal or a
-     * vertical grid line */
-    return fabs(round(position.x) - position.x) >= fabs(round(position.y) - position.y);
+bool is_wall_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset) {
+    int map_x = (int)floor(x);
+    int map_y = (int)floor(y);
+    *wall_type = '\0';
+
+    /* if outside of bounds  - counts as wall*/
+    if (!is_within_bounds(map_x, map_y)) {
+        *wall_type = '1';
+        return true;
+    }
+
+    if (!is_wall(map_x, map_y)) {
+        return false;
+    }
+
+    *wall_type = map[map_y][map_x];
+
+    /* check if horisontal or vertical wall, find texture offset accordingly */
+    if (fabs(roundf(x) - x) >= fabs(roundf(y) - y)) {
+        *tex_offset = x - floorf(x);
+    } else {
+        *tex_offset = y - floorf(y);
+    }
+
+    return true;
 }
 
 bool is_close_to_enemy(float x, float y) {
@@ -511,14 +561,17 @@ void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
     float dx = projectile->direction.x * PROJECTILE_SPEED * elapsed_time;
     float dy = projectile->direction.y * PROJECTILE_SPEED * elapsed_time;
 
-    projectile->x += dx;
-    projectile->y += dy;
+    float new_x = projectile->x + dx;
+    float new_y = projectile->y + dy;
 
-    char wall_type;
-    if (is_wall_collision(projectile->x, projectile->y, &wall_type)) {
+    if (is_collision(projectile->x, projectile->y, new_x, new_y)) {
         projectile->is_visible = false;
         return;
     }
+
+    /* move the project to the new position */
+    projectile->x = new_x;
+    projectile->y = new_y;
 
     /* check all other sprites but skip the first one - itself */
     for (int j = 1; j < num_sprites; j++) {
