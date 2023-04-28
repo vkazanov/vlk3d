@@ -96,6 +96,8 @@ int map_width;
 int map_height;
 
 Player player = {0, 0, 0};
+int coins_collected = 0;
+int enemies_left = 0;
 
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
@@ -150,8 +152,8 @@ float cast_ray(float angle, char *wall_type, float *tex_offset) ;
 bool is_wall(int x, int y);
 bool is_within_bounds(int x, int y) ;
 bool is_collision(float prev_x, float prev_y, float x, float y);
-bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset);
-bool is_wall_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset);
+bool is_door_collision(float x, float y, char *wall_type, float *tex_offset);
+bool is_wall_collision(float x, float y, char *wall_type, float *tex_offset);
 bool is_horizontal_wall(Vector2 position);
 bool has_no_things_to_do();
 
@@ -432,11 +434,11 @@ float cast_ray(float angle, char *wall_type, float *tex_offset) {
         float new_x = position.x + direction.x * RAY_STEP;
         float new_y = position.y + direction.y * RAY_STEP;
 
-        if (is_wall_collision(position.x, position.y, new_x, new_y, wall_type, tex_offset)) {
+        if (is_wall_collision(new_x, new_y, wall_type, tex_offset)) {
             break;
         }
 
-        if (is_door_collision(position.x, position.y, new_x, new_y, wall_type, tex_offset)) {
+        if (is_door_collision(new_x, new_y, wall_type, tex_offset)) {
             break;
         }
 
@@ -452,8 +454,8 @@ float cast_ray(float angle, char *wall_type, float *tex_offset) {
 bool is_collision(float prev_x, float prev_y, float x, float y) {
     char wall_type = '\0';
     float offset = 0.0f;
-    return is_wall_collision(prev_x, prev_y, x, y, &wall_type, &offset) ||
-        is_door_collision(prev_x, prev_y, x, y, &wall_type, &offset);
+    return is_wall_collision(x, y, &wall_type, &offset) ||
+        is_door_collision(x, y, &wall_type, &offset);
 }
 
 bool is_door(int map_x, int map_y) {
@@ -461,7 +463,7 @@ bool is_door(int map_x, int map_y) {
     return c == '-' || c == '|';
 }
 
-bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset) {
+bool is_door_collision(float x, float y, char *wall_type, float *tex_offset) {
     int map_x = (int)floor(x);
     int map_y = (int)floor(y);
 
@@ -513,7 +515,7 @@ bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_
     return false;
 }
 
-bool is_wall_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset) {
+bool is_wall_collision(float x, float y, char *wall_type, float *tex_offset) {
     int map_x = (int)floor(x);
     int map_y = (int)floor(y);
     *wall_type = '\0';
@@ -564,6 +566,8 @@ void init_poo(Object *object, int x, int y) {
         .hit = poo_hit,
         .touch = poo_touch
     };
+
+    enemies_left++;
 }
 
 void poo_hit(Object *object) {
@@ -572,10 +576,15 @@ void poo_hit(Object *object) {
     object->is_harmless = true;
     object->is_visible = false;
     object->is_touchable = false;
+
+    enemies_left--;
 }
 
 void poo_touch(Object *object) {
-    fprintf(stderr, "touch poo\n");
+    if (coins_collected)
+        coins_collected--;
+
+    fly_hit(object);
 }
 
 void init_fly(Object *object, int x, int y) {
@@ -596,6 +605,8 @@ void init_fly(Object *object, int x, int y) {
         .touch = fly_touch,
         .hit = fly_hit
     };
+
+    enemies_left++;
 }
 
 void fly_hit(Object *object) {
@@ -603,10 +614,15 @@ void fly_hit(Object *object) {
     object->is_hittable = false;
     object->is_harmless = true;
     object->is_visible = false;
+
+    enemies_left--;
 }
 
 void fly_touch(Object *object) {
-    fprintf(stderr, "touch fly\n");
+    if (coins_collected)
+        coins_collected--;
+
+    fly_hit(object);
 }
 
 void init_projectile(Object *object) {
@@ -718,6 +734,7 @@ void init_coin(Object *object, int x, int y) {
 
 void touch_coin(Object *object) {
     object->is_visible = false;
+    coins_collected++;
 }
 
 void update_objects(Uint32 elapsed_time) {
