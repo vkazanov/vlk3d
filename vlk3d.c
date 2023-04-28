@@ -724,7 +724,6 @@ void init_door(Sprite *sprite, int x, int y) {
 }
 
 void door_hit(Sprite *sprite) {
-    fprintf(stderr, "Door hit!\n");
     if (sprite->as.door.openness > 0.0f) {
         sprite->is_updateable = true;
         sprite->as.door.is_opening = true;
@@ -736,14 +735,12 @@ void door_update(Sprite *sprite, Uint32 elapsed_time) {
         return;
     }
     float diff = elapsed_time * 0.002f;
-    fprintf(stderr, "Door openness=%f updating by %f!\n", sprite->as.door.openness, diff);
     sprite->as.door.openness -= diff;
     if (sprite->as.door.openness <= 0.0f) {
         sprite->as.door.is_opening = false;
         sprite->is_updateable = false;
         sprite->is_hittable = false;
         sprite->as.door.openness = 0.0f;
-        fprintf(stderr, "Door open!\n");
     }
 }
 
