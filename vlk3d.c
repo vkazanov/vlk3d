@@ -912,24 +912,32 @@ void render_sprites(SDL_Renderer *renderer) {
 void render_ui(SDL_Renderer *renderer) {
     // Convert the coins_collected to a string
     char coin_str[50];
+    char enemy_str[50];
     snprintf(coin_str, sizeof(coin_str), "Coins: %d", coins_collected);
+    snprintf(enemy_str, sizeof(coin_str), "Enemies: %d", enemies_left);
 
     // Create a surface from the font and string
     SDL_Color font_color = {0, 0, 0, 255}; // White text
-    SDL_Surface *text_surface = TTF_RenderText_Solid(font, coin_str, font_color);
+    SDL_Surface *coin_text_surface = TTF_RenderText_Solid(font, coin_str, font_color);
+    SDL_Surface *enemy_text_surface = TTF_RenderText_Solid(font, enemy_str, font_color);
 
     // Create a texture from the surface
-    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+    SDL_Texture *coin_text_texture = SDL_CreateTextureFromSurface(renderer, coin_text_surface);
+    SDL_Texture *enemy_text_texture = SDL_CreateTextureFromSurface(renderer, enemy_text_surface);
 
     // Set the destination rectangle for the texture
-    SDL_Rect dest_rect = {WINDOW_WIDTH - text_surface->w - 10, 10, text_surface->w, text_surface->h};
+    SDL_Rect coin_dest_rect = {WINDOW_WIDTH - coin_text_surface->w - 10, 10, coin_text_surface->w, coin_text_surface->h};
+    SDL_Rect enemy_dest_rect = {10, 10, enemy_text_surface->w, enemy_text_surface->h};
 
     // Render the text texture
-    SDL_RenderCopy(renderer, text_texture, NULL, &dest_rect);
+    SDL_RenderCopy(renderer, coin_text_texture, NULL, &coin_dest_rect);
+    SDL_RenderCopy(renderer, enemy_text_texture, NULL, &enemy_dest_rect);
 
     // Clean up
-    SDL_FreeSurface(text_surface);
-    SDL_DestroyTexture(text_texture);
+    SDL_FreeSurface(coin_text_surface);
+    SDL_FreeSurface(enemy_text_surface);
+    SDL_DestroyTexture(coin_text_texture);
+    SDL_DestroyTexture(enemy_text_texture);
 }
 
 void fire_projectile(void) {
