@@ -40,7 +40,7 @@ typedef struct {
 
 typedef enum {
     GAME_RESULT_WIN,
-    GAME_RESULT_DIE,
+    GAME_RESULT_DIE,            /* TODO: unused for now */
     GAME_RESULT_ABORT
 } game_result_t;
 
@@ -49,6 +49,8 @@ typedef enum {
 #define PLAYER_MOVEMENT_SPEED 0.1
 
 #define PROJECTILE_SPEED 0.003f
+
+TTF_Font *font;
 
 int line_height_buffer[RAY_COUNT] = {0};
 
@@ -151,7 +153,7 @@ void render_walls(SDL_Renderer *renderer);
 float cast_ray(float angle, char *wall_type, float *tex_offset) ;
 bool is_wall(int x, int y);
 bool is_within_bounds(int x, int y) ;
-bool is_collision(float prev_x, float prev_y, float x, float y);
+bool is_collision(float x, float y);
 bool is_door_collision(float x, float y, char *wall_type, float *tex_offset);
 bool is_wall_collision(float x, float y, char *wall_type, float *tex_offset);
 bool is_horizontal_wall(Vector2 position);
@@ -181,10 +183,12 @@ void door_update(Object *object, Uint32 elapsed_time);
 void update_objects(Uint32 elapsed_time);
 
 void render_sprites(SDL_Renderer *renderer);
+void render_text(SDL_Renderer *renderer, const char *message, SDL_Color color, SDL_Color outline_color, int x, int y);
+void render_ui(SDL_Renderer *renderer);
+
 void fire_projectile(void);
 void free_maps(void);
 void load_maps(const char *filename);
-void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y);
 void wait_for_key_press();
 
 void load_textures(SDL_Renderer *renderer);
@@ -225,7 +229,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    TTF_Font *font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48);
+    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48);
     if (font == NULL) {
         fprintf(stderr, "Failed to load font: %s\n", TTF_GetError());
         TTF_Quit();
@@ -263,12 +267,7 @@ int main(int argc, char *argv[]) {
     SDL_Color black = {0, 0, 0, 255}; // New outline color
     switch (game_loop(renderer)) {
     case GAME_RESULT_WIN:
-        render_text(renderer, "You win!", font, white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24);
-        SDL_RenderPresent(renderer);
-        wait_for_key_press();
-        break;
-    case GAME_RESULT_DIE:
-        render_text(renderer, "You lose!", font, white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24);
+        render_text(renderer, "You win!", white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24);
         SDL_RenderPresent(renderer);
         wait_for_key_press();
         break;
@@ -315,6 +314,7 @@ game_result_t game_loop(SDL_Renderer *renderer) {
 
         render_walls(renderer);
         render_sprites(renderer);
+        render_ui(renderer);
 
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
@@ -337,14 +337,14 @@ void handle_events(SDL_Event *event, bool *is_running) {
         } else if (event->key.keysym.sym == SDLK_UP) {
             float new_x = player.x + cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float new_y = player.y + sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            if (!is_collision(player.x, player.y, new_x, new_y)) {
+            if (!is_collision(new_x, new_y)) {
                 player.x = new_x;
                 player.y = new_y;
             }
         } else if (event->key.keysym.sym == SDLK_DOWN) {
             float new_x = player.x - cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float new_y = player.y - sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            if (!is_collision(player.x, player.y, new_x, new_y)) {
+            if (!is_collision(new_x, new_y)) {
                 player.x = new_x;
                 player.y = new_y;
             }
@@ -451,7 +451,7 @@ float cast_ray(float angle, char *wall_type, float *tex_offset) {
     return distance;
 }
 
-bool is_collision(float prev_x, float prev_y, float x, float y) {
+bool is_collision(float x, float y) {
     char wall_type = '\0';
     float offset = 0.0f;
     return is_wall_collision(x, y, &wall_type, &offset) ||
@@ -644,7 +644,7 @@ void projectile_update(Object *projectile, Uint32 elapsed_time) {
     float new_x = projectile->x + dx;
     float new_y = projectile->y + dy;
 
-    if (is_collision(projectile->x, projectile->y, new_x, new_y)) {
+    if (is_collision(new_x, new_y)) {
         goto remove_projectile;
     }
 
@@ -890,6 +890,29 @@ void render_sprites(SDL_Renderer *renderer) {
     }
 }
 
+void render_ui(SDL_Renderer *renderer) {
+    // Convert the coins_collected to a string
+    char coin_str[50];
+    snprintf(coin_str, sizeof(coin_str), "Coins: %d", coins_collected);
+
+    // Create a surface from the font and string
+    SDL_Color font_color = {0, 0, 0, 255}; // White text
+    SDL_Surface *text_surface = TTF_RenderText_Solid(font, coin_str, font_color);
+
+    // Create a texture from the surface
+    SDL_Texture *text_texture = SDL_CreateTextureFromSurface(renderer, text_surface);
+
+    // Set the destination rectangle for the texture
+    SDL_Rect dest_rect = {WINDOW_WIDTH - text_surface->w - 10, 10, text_surface->w, text_surface->h};
+
+    // Render the text texture
+    SDL_RenderCopy(renderer, text_texture, NULL, &dest_rect);
+
+    // Clean up
+    SDL_FreeSurface(text_surface);
+    SDL_DestroyTexture(text_texture);
+}
+
 void fire_projectile(void) {
     Object *projectile = &objects[0];
     if (projectile->is_visible)
@@ -1007,7 +1030,7 @@ void free_maps(void) {
     free(door_map);
 }
 
-void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y) {
+void render_text(SDL_Renderer *renderer, const char *message, SDL_Color color, SDL_Color outline_color, int x, int y) {
     SDL_Surface *text_surface = TTF_RenderText_Blended(font, message, color);
     SDL_Surface *outline_surface = TTF_RenderText_Blended(font, message, outline_color);
 
