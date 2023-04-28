@@ -3,6 +3,7 @@
 #include <math.h>
 #include <float.h>
 #include <time.h>
+#include <assert.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
@@ -62,6 +63,7 @@ SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
 SDL_Texture *flower_texture = NULL;
+SDL_Texture *coin_texture = NULL;
 
 struct {
     SDL_Texture **texture;
@@ -75,6 +77,7 @@ struct {
     { &poo_texture, "poo.png"},
     { &brush_texture, "brush.png"},
     { &flower_texture, "flower.png"},
+    { &coin_texture, "coin.png"},
 };
 
 SDL_Texture **char_to_texture_table[] = {
@@ -104,12 +107,17 @@ struct Object {
     float x, y;
     Vector2 direction;
     float hit_distance;
+    float touch_distance;
+
     bool is_updateable;
     bool is_hittable;
     bool is_visible;
     bool is_harmless;
+    bool is_touchable;
+
     void (*update) (Object *Object, Uint32 elapsed_time);
     void (*hit) (Object *Object);
+    void (*touch) (Object *Object);
 
     float distance_to_player;
     float angle_to_player;
@@ -145,17 +153,21 @@ bool is_collision(float prev_x, float prev_y, float x, float y);
 bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset);
 bool is_wall_collision(float prev_x, float prev_y, float x, float y, char *wall_type, float *tex_offset);
 bool is_horizontal_wall(Vector2 position);
-bool is_close_to_enemy(float x, float y);
 bool has_no_things_to_do();
 
 void init_poo(Object *object, int x, int y);
 void poo_hit(Object *object);
+void poo_touch(Object *object);
 
 void init_fly(Object *object, int x, int y);
 void fly_hit(Object *object);
 void fly_update(Object *object, Uint32 elapsed_time);
+void fly_touch(Object *object);
 
 void init_flower(Object *object, int x, int y);
+
+void init_coin(Object *object, int x, int y);
+void touch_coin(Object *object);
 
 void init_projectile(Object *object);
 void projectile_update(Object *object, Uint32 elapsed_time);
@@ -293,9 +305,6 @@ game_result_t game_loop(SDL_Renderer *renderer) {
 
         while (SDL_PollEvent(&event))
             handle_events(&event, &is_running);
-
-        if (is_close_to_enemy(player.x, player.y))
-            return GAME_RESULT_DIE;
 
         if (has_no_things_to_do())
             return GAME_RESULT_WIN;
@@ -531,19 +540,6 @@ bool is_wall_collision(float prev_x, float prev_y, float x, float y, char *wall_
     return true;
 }
 
-bool is_close_to_enemy(float x, float y) {
-    for (int i = 0; i < num_objects; i++) {
-        if (!objects[i].is_visible) {
-            continue;
-        }
-        float distance = sqrtf(powf(x - objects[i].x, 2) + powf(y - objects[i].y, 2));
-        if (distance < ENEMY_PROXIMITY_DISTANCE && !objects[i].is_harmless) {
-            return true;
-        }
-    }
-    return false;
-}
-
 bool has_no_things_to_do() {
     for (int i = 0; i < num_objects; i++) {
         if (!objects[i].is_harmless) {
@@ -562,8 +558,11 @@ void init_poo(Object *object, int x, int y) {
         .is_hittable = true,
         .is_harmless = false,
         .is_visible = true,
+        .is_touchable = true,
+        .touch_distance = 0.5,
         .hit_distance = 0.5,
-        .hit = poo_hit
+        .hit = poo_hit,
+        .touch = poo_touch
     };
 }
 
@@ -572,6 +571,11 @@ void poo_hit(Object *object) {
     object->is_hittable = false;
     object->is_harmless = true;
     object->is_visible = false;
+    object->is_touchable = false;
+}
+
+void poo_touch(Object *object) {
+    fprintf(stderr, "touch poo\n");
 }
 
 void init_fly(Object *object, int x, int y) {
@@ -583,8 +587,13 @@ void init_fly(Object *object, int x, int y) {
         .is_harmless = false,
         .is_visible = true,
         .is_hittable = true,
+        .is_touchable = true,
+
         .hit_distance = 0.25,
+        .touch_distance = 0.25,
+
         .update = fly_update,
+        .touch = fly_touch,
         .hit = fly_hit
     };
 }
@@ -596,6 +605,10 @@ void fly_hit(Object *object) {
     object->is_visible = false;
 }
 
+void fly_touch(Object *object) {
+    fprintf(stderr, "touch fly\n");
+}
+
 void init_projectile(Object *object) {
     *object = (typeof(*object)) {
         .texture = brush_texture,
@@ -603,7 +616,6 @@ void init_projectile(Object *object) {
         .is_hittable = false,
         .is_visible = false,
         .is_harmless = true,
-        .hit_distance = 1000,
         .update = projectile_update
     };
 
@@ -691,15 +703,47 @@ void init_flower(Object *object, int x, int y) {
     };
 }
 
-void update_objects(Uint32 elapsed_time) {
-    for (int i = 0; i < num_objects; i++) {
-        if (!objects[i].is_updateable)
-            continue;
+void init_coin(Object *object, int x, int y) {
+    *object = (typeof(*object)) {
+        .texture = coin_texture,
+        .x = x + 0.5,
+        .y = y + 0.5,
+        .is_harmless = true,
+        .is_visible = true,
+        .is_touchable = true,
+        .touch_distance = 0.5,
+        .touch = touch_coin
+    };
+}
 
-        void (*update_function) = objects[i].update;
-        if (update_function)
+void touch_coin(Object *object) {
+    object->is_visible = false;
+}
+
+void update_objects(Uint32 elapsed_time) {
+    /* update  */
+    for (int i = 0; i < num_objects; i++) {
+        if (objects[i].is_updateable && objects[i].update) {
             objects[i].update(&objects[i], elapsed_time);
+        }
     }
+
+    /* touch */
+    for (int i = 0; i < num_objects; i++) {
+        if (!objects[i].is_touchable) {
+            continue;
+        }
+
+        float distance_to_object = sqrtf(powf(objects[i].x - player.x, 2) + powf(objects[i].y - player.y, 2));
+        if (distance_to_object > objects[i].touch_distance) {
+            continue;
+        }
+
+        assert(objects[i].touch);
+
+        objects[i].touch(&objects[i]);
+    }
+
 }
 
 void init_door(Object *object, int x, int y) {
@@ -748,11 +792,12 @@ int compare_objects_by_distance(const void *left, const void *right) {
     return ((Object *)left)->distance_to_player < ((Object *)right)->distance_to_player ? -1 : 1;
 }
 
+Object *objects_visible[MAX_OBJECTS] = {0};
+
 void render_sprites(SDL_Renderer *renderer) {
     /* Collect sprites that are visible and qsort them based on line height (aka
      * distance). This'll solve the sprite overlapping problem. */
 
-    Object *objects_visible[MAX_OBJECTS] = {0};
     int num_objects_visible = 0;
     for (int i = 0; i < num_objects; i++) {
         if (!objects[i].is_visible) {
@@ -891,6 +936,14 @@ void load_maps(const char *filename) {
                     goto too_many_objects;
                 }
                 init_fly(&objects[num_objects], x, y);
+                num_objects++;
+                map[y][x] = ' ';
+                break;
+            case 'c':
+                if (num_objects >= MAX_OBJECTS) {
+                    goto too_many_objects;
+                }
+                init_coin(&objects[num_objects], x, y);
                 num_objects++;
                 map[y][x] = ' ';
                 break;
