@@ -117,7 +117,7 @@ struct Object {
     union {
         struct {
             bool is_opening;
-            float openness;
+            float door_width;
         } door;
     } as;
 };
@@ -128,7 +128,7 @@ int num_objects = 0;
 
 
 /* A map of doors in the game. Each float is a state of the door, i.e. the
- * openness "persentage" use to either draw door column upon ray hit, or just
+ * door_width "persentage" use to either draw door column upon ray hit, or just
  * ignore it */
 Object ***door_map;
 
@@ -464,7 +464,7 @@ bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_
     *wall_type = map[map_y][map_x];
 
     Object *door_object = door_map[map_y][map_x];
-    float openness = door_object->as.door.openness;
+    float door_width = door_object->as.door.door_width;
 
     /* horizontal door */
     if (map[map_y][map_x] == '-') {
@@ -475,8 +475,8 @@ bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_
             return false;
         }
 
-        if (x_diff < openness) {
-            *tex_offset = 1 - openness + x_diff;
+        if (x_diff < door_width) {
+            *tex_offset = 1 - door_width + x_diff;
             return true;
         } else {
             return false;
@@ -492,8 +492,8 @@ bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_
             return false;
         }
 
-        if (y_diff < openness) {
-            *tex_offset = 1 - openness + y_diff;
+        if (y_diff < door_width) {
+            *tex_offset = 1 - door_width + y_diff;
             return true;
         }
 
@@ -718,13 +718,13 @@ void init_door(Object *object, int x, int y) {
 
         .as.door = {
             .is_opening = false,
-            .openness = 1.0f
+            .door_width = 1.0f
         }
     };
 }
 
 void door_hit(Object *object) {
-    if (object->as.door.openness > 0.0f) {
+    if (object->as.door.door_width > 0.0f) {
         object->is_updateable = true;
         object->as.door.is_opening = true;
     }
@@ -735,12 +735,12 @@ void door_update(Object *object, Uint32 elapsed_time) {
         return;
     }
     float diff = elapsed_time * 0.002f;
-    object->as.door.openness -= diff;
-    if (object->as.door.openness <= 0.0f) {
+    object->as.door.door_width -= diff;
+    if (object->as.door.door_width <= 0.0f) {
         object->as.door.is_opening = false;
         object->is_updateable = false;
         object->is_hittable = false;
-        object->as.door.openness = 0.0f;
+        object->as.door.door_width = 0.0f;
     }
 }
 
