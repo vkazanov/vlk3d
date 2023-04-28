@@ -50,7 +50,11 @@ typedef enum {
 
 #define PROJECTILE_SPEED 0.003f
 
-TTF_Font *font;
+TTF_Font *font = NULL;
+
+Mix_Chunk *door_sound = NULL;
+Mix_Chunk *pain_sound = NULL;
+
 
 int line_height_buffer[RAY_COUNT] = {0};
 
@@ -191,6 +195,9 @@ void free_maps(void);
 void load_maps(const char *filename);
 void wait_for_key_press();
 
+void load_sound(void);
+void free_sound(void);
+
 void load_textures(SDL_Renderer *renderer);
 void free_textures(void);
 
@@ -259,6 +266,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    load_sound();
     load_textures(renderer);
     load_maps("map.txt");
     Mix_PlayMusic(music, -1);
@@ -277,11 +285,10 @@ int main(int argc, char *argv[]) {
     }
 
     free_maps();
+    free_sound();
+    free_textures();
 
     Mix_FreeMusic(music);
-    Mix_CloseAudio();
-
-    free_textures();
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
@@ -496,23 +503,23 @@ bool is_door_collision(float x, float y, char *wall_type, float *tex_offset) {
 
     /* if vertical door */
     if (map[map_y][map_x] == '|') {
-        float x_diff = fabs(fabs(roundf(x) - x) - 0.5);
-        float y_diff = y - floorf(y);
+            float x_diff = fabs(fabs(roundf(x) - x) - 0.5);
+            float y_diff = y - floorf(y);
 
-        if (x_diff >= 0.02f) {
+            if (x_diff >= 0.02f) {
+                return false;
+            }
+
+            if (y_diff < door_width) {
+                *tex_offset = 1 - door_width + y_diff;
+                return true;
+            }
+
             return false;
         }
 
-        if (y_diff < door_width) {
-            *tex_offset = 1 - door_width + y_diff;
-            return true;
-        }
-
+        /* unreachable */
         return false;
-    }
-
-    /* unreachable */
-    return false;
 }
 
 bool is_wall_collision(float x, float y, char *wall_type, float *tex_offset) {
@@ -584,7 +591,9 @@ void poo_touch(Object *object) {
     if (coins_collected)
         coins_collected--;
 
-    fly_hit(object);
+    poo_hit(object);
+
+    Mix_PlayChannel(-1, pain_sound, 0);
 }
 
 void init_fly(Object *object, int x, int y) {
@@ -614,6 +623,7 @@ void fly_hit(Object *object) {
     object->is_hittable = false;
     object->is_harmless = true;
     object->is_visible = false;
+    object->is_touchable = false;
 
     enemies_left--;
 }
@@ -623,6 +633,8 @@ void fly_touch(Object *object) {
         coins_collected--;
 
     fly_hit(object);
+
+    Mix_PlayChannel(-1, pain_sound, 0);
 }
 
 void init_projectile(Object *object) {
@@ -734,7 +746,9 @@ void init_coin(Object *object, int x, int y) {
 
 void touch_coin(Object *object) {
     object->is_visible = false;
+    object->is_touchable = false;
     coins_collected++;
+
 }
 
 void update_objects(Uint32 elapsed_time) {
@@ -788,6 +802,8 @@ void door_hit(Object *object) {
     if (object->as.door.door_width > 0.0f) {
         object->is_updateable = true;
         object->as.door.is_opening = true;
+
+        Mix_PlayChannel(-1, door_sound, 0);
     }
 }
 
@@ -1107,4 +1123,22 @@ void free_textures(void) {
     for (int i = 0; i < sizeof(name_to_texture_table) / sizeof(name_to_texture_table[0]); i++) {
         SDL_DestroyTexture(*name_to_texture_table[i].texture);
     }
+}
+
+void load_sound(void) {
+    door_sound = Mix_LoadWAV("door.wav");
+    if (door_sound == NULL) {
+        printf("Failed to load sound: %s\n", Mix_GetError());
+        exit(1);
+    }
+
+    pain_sound = Mix_LoadWAV("pain.wav");
+    if (pain_sound == NULL) {
+        printf("Failed to load sound: %s\n", Mix_GetError());
+        exit(1);
+    }
+}
+
+void free_sound(void) {
+    Mix_FreeChunk(door_sound);
 }

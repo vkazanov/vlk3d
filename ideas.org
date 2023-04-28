@@ -6,9 +6,7 @@ Nika's ideas:
 
 - [X] room doors
 
-- [ ] colorful win/lose letters
-
-- [ ] fireworks when winning
+- [X] coins
 
 - [-] different kinds of monsters: moving, hiding, shooting, poo, flies
 
@@ -24,7 +22,9 @@ Nika's ideas:
 
   - [ ] flowers to water
 
-- [ ] coins
+- [ ] colorful win/lose letters
+
+- [ ] fireworks when winning
 
 - [ ] timer for a level
 
@@ -49,11 +49,17 @@ My ideas:
 
 - [X] a better way to load textures/sprites (a table?)
 
-- [ ] the is_wall_collision function should use both old x/y and delta x/y to figure out
-  whether map_x, map_y changed
-
 - [ ] simple wall shading wolf3d-style by coloring horizontal/vertical walls differently
 
 - [ ] double buffering for cleaner animated feeling
 
 - [ ] loading a map from cli args
+
+
+Bugs:
+
+- [ ] sometimes going through doors
+
+- [ ] perspective (sprite sorting?)
+
+- [ ] enemy touching (too many coins deducted)
