@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 128) < 0) {
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 512) < 0) {
         printf("Error initializing SDL_mixer: %s\n", Mix_GetError());
         SDL_Quit();
         return 1;
