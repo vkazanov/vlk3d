@@ -96,10 +96,10 @@ Player player = {0, 0, 0};
 
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
-/* Objects are updateable entities. They might represent a sprite (if the
+/* Objects are updateable entities. They might represent a object (if the
  * texture is there) */
-typedef struct Sprite Sprite;
-struct Sprite {
+typedef struct Object Object;
+struct Object {
     SDL_Texture *texture;
     float x, y;
     Vector2 direction;
@@ -108,8 +108,8 @@ struct Sprite {
     bool is_hittable;
     bool is_visible;
     bool is_harmless;
-    void (*update) (Sprite *Sprite, Uint32 elapsed_time);
-    void (*hit) (Sprite *Sprite);
+    void (*update) (Object *Object, Uint32 elapsed_time);
+    void (*hit) (Object *Object);
 
     float distance_to_player;
     float angle_to_player;
@@ -122,15 +122,15 @@ struct Sprite {
     } as;
 };
 
-#define MAX_SPRITES 50
-Sprite sprites[MAX_SPRITES];
-int num_sprites = 0;
+#define MAX_OBJECTS 50
+Object objects[MAX_OBJECTS];
+int num_objects = 0;
 
 
 /* A map of doors in the game. Each float is a state of the door, i.e. the
  * openness "persentage" use to either draw door column upon ray hit, or just
  * ignore it */
-Sprite ***door_map;
+Object ***door_map;
 
 
 /* Function prototypes */
@@ -148,23 +148,23 @@ bool is_horizontal_wall(Vector2 position);
 bool is_close_to_enemy(float x, float y);
 bool has_no_things_to_do();
 
-void init_poo(Sprite *sprite, int x, int y);
-void poo_hit(Sprite *sprite);
+void init_poo(Object *object, int x, int y);
+void poo_hit(Object *object);
 
-void init_fly(Sprite *sprite, int x, int y);
-void fly_hit(Sprite *sprite);
-void fly_update(Sprite *sprite, Uint32 elapsed_time);
+void init_fly(Object *object, int x, int y);
+void fly_hit(Object *object);
+void fly_update(Object *object, Uint32 elapsed_time);
 
-void init_flower(Sprite *sprite, int x, int y);
+void init_flower(Object *object, int x, int y);
 
-void init_projectile(Sprite *sprite);
-void projectile_update(Sprite *sprite, Uint32 elapsed_time);
+void init_projectile(Object *object);
+void projectile_update(Object *object, Uint32 elapsed_time);
 
-void init_door(Sprite *sprite, int x, int y);
-void door_hit(Sprite *sprite);
-void door_update(Sprite *sprite, Uint32 elapsed_time);
+void init_door(Object *object, int x, int y);
+void door_hit(Object *object);
+void door_update(Object *object, Uint32 elapsed_time);
 
-void update_sprites(Uint32 elapsed_time);
+void update_objects(Uint32 elapsed_time);
 
 void render_sprites(SDL_Renderer *renderer);
 void fire_projectile(void);
@@ -300,7 +300,7 @@ game_result_t game_loop(SDL_Renderer *renderer) {
         if (has_no_things_to_do())
             return GAME_RESULT_WIN;
 
-        update_sprites(elapsed_time);
+        update_objects(elapsed_time);
 
         render_walls(renderer);
         render_sprites(renderer);
@@ -463,8 +463,8 @@ bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_
 
     *wall_type = map[map_y][map_x];
 
-    Sprite *door_sprite = door_map[map_y][map_x];
-    float openness = door_sprite->as.door.openness;
+    Object *door_object = door_map[map_y][map_x];
+    float openness = door_object->as.door.openness;
 
     /* horizontal door */
     if (map[map_y][map_x] == '-') {
@@ -532,12 +532,12 @@ bool is_wall_collision(float prev_x, float prev_y, float x, float y, char *wall_
 }
 
 bool is_close_to_enemy(float x, float y) {
-    for (int i = 0; i < num_sprites; i++) {
-        if (!sprites[i].is_visible) {
+    for (int i = 0; i < num_objects; i++) {
+        if (!objects[i].is_visible) {
             continue;
         }
-        float distance = sqrtf(powf(x - sprites[i].x, 2) + powf(y - sprites[i].y, 2));
-        if (distance < ENEMY_PROXIMITY_DISTANCE && !sprites[i].is_harmless) {
+        float distance = sqrtf(powf(x - objects[i].x, 2) + powf(y - objects[i].y, 2));
+        if (distance < ENEMY_PROXIMITY_DISTANCE && !objects[i].is_harmless) {
             return true;
         }
     }
@@ -545,16 +545,16 @@ bool is_close_to_enemy(float x, float y) {
 }
 
 bool has_no_things_to_do() {
-    for (int i = 0; i < num_sprites; i++) {
-        if (!sprites[i].is_harmless) {
+    for (int i = 0; i < num_objects; i++) {
+        if (!objects[i].is_harmless) {
             return false;
         }
     }
     return true;
 }
 
-void init_poo(Sprite *sprite, int x, int y) {
-    *sprite = (typeof(*sprite)) {
+void init_poo(Object *object, int x, int y) {
+    *object = (typeof(*object)) {
         .texture = poo_texture,
         .x = x + 0.5,
         .y = y + 0.5,
@@ -567,15 +567,15 @@ void init_poo(Sprite *sprite, int x, int y) {
     };
 }
 
-void poo_hit(Sprite *sprite) {
-    sprite->is_updateable = false;
-    sprite->is_hittable = false;
-    sprite->is_harmless = true;
-    sprite->is_visible = false;
+void poo_hit(Object *object) {
+    object->is_updateable = false;
+    object->is_hittable = false;
+    object->is_harmless = true;
+    object->is_visible = false;
 }
 
-void init_fly(Sprite *sprite, int x, int y) {
-    *sprite = (typeof(*sprite)) {
+void init_fly(Object *object, int x, int y) {
+    *object = (typeof(*object)) {
         .texture = fly_texture,
         .x = x + 0.5,
         .y = y + 0.5,
@@ -589,15 +589,15 @@ void init_fly(Sprite *sprite, int x, int y) {
     };
 }
 
-void fly_hit(Sprite *sprite) {
-    sprite->is_updateable = false;
-    sprite->is_hittable = false;
-    sprite->is_harmless = true;
-    sprite->is_visible = false;
+void fly_hit(Object *object) {
+    object->is_updateable = false;
+    object->is_hittable = false;
+    object->is_harmless = true;
+    object->is_visible = false;
 }
 
-void init_projectile(Sprite *sprite) {
-    *sprite = (typeof(*sprite)) {
+void init_projectile(Object *object) {
+    *object = (typeof(*object)) {
         .texture = brush_texture,
         .is_updateable = false,
         .is_hittable = false,
@@ -609,7 +609,7 @@ void init_projectile(Sprite *sprite) {
 
 }
 
-void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
+void projectile_update(Object *projectile, Uint32 elapsed_time) {
     float dx = projectile->direction.x * PROJECTILE_SPEED * elapsed_time;
     float dy = projectile->direction.y * PROJECTILE_SPEED * elapsed_time;
 
@@ -624,17 +624,17 @@ void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
     projectile->x = new_x;
     projectile->y = new_y;
 
-    /* check all other sprites but skip the first one - itself */
-    for (int j = 1; j < num_sprites; j++) {
-        if (!sprites[j].is_hittable) {
+    /* check all other objects but skip the first one - itself */
+    for (int j = 1; j < num_objects; j++) {
+        if (!objects[j].is_hittable) {
             continue;
         }
-        float dist_x = sprites[j].x - projectile->x;
-        float dist_y = sprites[j].y - projectile->y;
+        float dist_x = objects[j].x - projectile->x;
+        float dist_y = objects[j].y - projectile->y;
         float distance = sqrtf(dist_x * dist_x + dist_y * dist_y);
 
-        if (distance < sprites[j].hit_distance) {
-            sprites[j].hit(&sprites[j]);
+        if (distance < objects[j].hit_distance) {
+            objects[j].hit(&objects[j]);
             goto remove_projectile;
         }
     }
@@ -650,7 +650,7 @@ float random_float(float min, float max) {
     return min + scale * (max - min);
 }
 
-void fly_update(Sprite *sprite, Uint32 elapsed_time) {
+void fly_update(Object *object, Uint32 elapsed_time) {
     /* Speed factor*/
     const float speed = 0.002f;
 
@@ -663,8 +663,8 @@ void fly_update(Sprite *sprite, Uint32 elapsed_time) {
     dy *= elapsed_time * speed;
 
     /* Calculate the new position */
-    float new_x = sprite->x + dx;
-    float new_y = sprite->y + dy;
+    float new_x = object->x + dx;
+    float new_y = object->y + dy;
 
     /* Check if the new position is within map boundaries and not a wall */
     int new_tile_x = (int)new_x;
@@ -674,13 +674,13 @@ void fly_update(Sprite *sprite, Uint32 elapsed_time) {
         new_tile_y >= 0 && new_tile_y < map_height &&
         map[new_tile_y][new_tile_x] != '1') {
 
-        sprite->x = new_x;
-        sprite->y = new_y;
+        object->x = new_x;
+        object->y = new_y;
     }
 }
 
-void init_flower(Sprite *sprite, int x, int y) {
-    *sprite = (typeof(*sprite)) {
+void init_flower(Object *object, int x, int y) {
+    *object = (typeof(*object)) {
         .texture = flower_texture,
         .x = x + 0.5,
         .y = y + 0.5,
@@ -691,19 +691,19 @@ void init_flower(Sprite *sprite, int x, int y) {
     };
 }
 
-void update_sprites(Uint32 elapsed_time) {
-    for (int i = 0; i < num_sprites; i++) {
-        if (!sprites[i].is_updateable)
+void update_objects(Uint32 elapsed_time) {
+    for (int i = 0; i < num_objects; i++) {
+        if (!objects[i].is_updateable)
             continue;
 
-        void (*update_function) = sprites[i].update;
+        void (*update_function) = objects[i].update;
         if (update_function)
-            sprites[i].update(&sprites[i], elapsed_time);
+            objects[i].update(&objects[i], elapsed_time);
     }
 }
 
-void init_door(Sprite *sprite, int x, int y) {
-    *sprite = (typeof(*sprite)) {
+void init_door(Object *object, int x, int y) {
+    *object = (typeof(*object)) {
         .texture = NULL,        /* do not render */
         .x = x + 0.5,
         .y = y + 0.5,
@@ -723,94 +723,94 @@ void init_door(Sprite *sprite, int x, int y) {
     };
 }
 
-void door_hit(Sprite *sprite) {
-    if (sprite->as.door.openness > 0.0f) {
-        sprite->is_updateable = true;
-        sprite->as.door.is_opening = true;
+void door_hit(Object *object) {
+    if (object->as.door.openness > 0.0f) {
+        object->is_updateable = true;
+        object->as.door.is_opening = true;
     }
 }
 
-void door_update(Sprite *sprite, Uint32 elapsed_time) {
-    if (!sprite->as.door.is_opening) {
+void door_update(Object *object, Uint32 elapsed_time) {
+    if (!object->as.door.is_opening) {
         return;
     }
     float diff = elapsed_time * 0.002f;
-    sprite->as.door.openness -= diff;
-    if (sprite->as.door.openness <= 0.0f) {
-        sprite->as.door.is_opening = false;
-        sprite->is_updateable = false;
-        sprite->is_hittable = false;
-        sprite->as.door.openness = 0.0f;
+    object->as.door.openness -= diff;
+    if (object->as.door.openness <= 0.0f) {
+        object->as.door.is_opening = false;
+        object->is_updateable = false;
+        object->is_hittable = false;
+        object->as.door.openness = 0.0f;
     }
 }
 
-int compare_sprites_by_distance(const void *left, const void *right) {
-    return ((Sprite *)left)->distance_to_player < ((Sprite *)right)->distance_to_player ? -1 : 1;
+int compare_objects_by_distance(const void *left, const void *right) {
+    return ((Object *)left)->distance_to_player < ((Object *)right)->distance_to_player ? -1 : 1;
 }
 
 void render_sprites(SDL_Renderer *renderer) {
     /* Collect sprites that are visible and qsort them based on line height (aka
      * distance). This'll solve the sprite overlapping problem. */
 
-    Sprite *sprites_visible[MAX_SPRITES] = {0};
-    int num_sprites_visible = 0;
-    for (int i = 0; i < num_sprites; i++) {
-        if (!sprites[i].is_visible) {
+    Object *objects_visible[MAX_OBJECTS] = {0};
+    int num_objects_visible = 0;
+    for (int i = 0; i < num_objects; i++) {
+        if (!objects[i].is_visible) {
             continue;
         }
 
         /* Angle between a player space positive x-axis and sprite positiion */
-        float angle = atan2f(sprites[i].y - player.y, sprites[i].x - player.x);
+        float angle = atan2f(objects[i].y - player.y, objects[i].x - player.x);
 
-        /* Find the angle between player's direction vector and the sprite and
+        /* Find the angle between player's direction vector and the object and
          * normalize it */
         float relative_angle = player.direction - angle;
         if (relative_angle > M_PI) {
             relative_angle -= 2 * M_PI;
         }
 
-        /* Check if the sprite is in the player's field of view */
+        /* Check if the object is in the player's field of view */
         if (relative_angle < -FOV / 2.0 || relative_angle > FOV / 2.0) {
             continue;
         }
 
         /* Distance and fisheye effect correction */
-        float distance_to_sprite = sqrtf(powf(sprites[i].x - player.x, 2) + powf(sprites[i].y - player.y, 2));
-        distance_to_sprite *= cosf(relative_angle);
+        float distance_to_object = sqrtf(powf(objects[i].x - player.x, 2) + powf(objects[i].y - player.y, 2));
+        distance_to_object *= cosf(relative_angle);
 
-        sprites_visible[num_sprites_visible] = &sprites[i];
-        sprites_visible[num_sprites_visible]->distance_to_player = distance_to_sprite;
-        sprites_visible[num_sprites_visible]->angle_to_player = relative_angle;
+        objects_visible[num_objects_visible] = &objects[i];
+        objects_visible[num_objects_visible]->distance_to_player = distance_to_object;
+        objects_visible[num_objects_visible]->angle_to_player = relative_angle;
 
-        num_sprites_visible++;
+        num_objects_visible++;
     }
 
     /* Now, sort the array based on distance to the player */
-    qsort(sprites_visible, num_sprites_visible, sizeof(Sprite *), compare_sprites_by_distance);
+    qsort(objects_visible, num_objects_visible, sizeof(Object *), compare_objects_by_distance);
 
-    /* Go through visible sprites and draw them */
-    for (int i = 0; i < num_sprites_visible; i++) {
-        Sprite *sprite = sprites_visible[i];
+    /* Go through visible objects and draw them */
+    for (int i = 0; i < num_objects_visible; i++) {
+        Object *object = objects_visible[i];
 
-        /* Sprite line height based on the distance to the player  */
-        int line_height = (int)(WINDOW_HEIGHT / sprite->distance_to_player);
+        /* Object line height based on the distance to the player  */
+        int line_height = (int)(WINDOW_HEIGHT / object->distance_to_player);
 
         /* Calculate the horizontal position of the enemy on the screen */
-        int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(sprite->angle_to_player) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
+        int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(object->angle_to_player) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
 
-        /* Calculate the size of the sprite */
-        const int sprite_size = (int)(line_height);
+        /* Calculate the size of the object */
+        const int object_size = (int)(line_height);
 
         /* Render the texture column by column */
-        for (int col = 0; col < sprite_size; col++) {
-            /* find the current sprite column to check and make sure it doesn't
+        for (int col = 0; col < object_size; col++) {
+            /* find the current object column to check and make sure it doesn't
              * go above the number of rays casted - this might cause a crash
-             * when standing right next to the sprites */
-            int screen_col = screen_x - sprite_size / 2 + col;
+             * when standing right next to the objects */
+            int screen_col = screen_x - object_size / 2 + col;
             if (screen_col < 0 || screen_col >= RAY_COUNT)
                 continue;
 
-            /* see if the wall column for this ray is further away than sprite
+            /* see if the wall column for this ray is further away than object
              * column. Ignore otherise.*/
             int wall_line_height = line_height_buffer[screen_col];
             if (line_height < wall_line_height)
@@ -819,17 +819,17 @@ void render_sprites(SDL_Renderer *renderer) {
             /* Calculate the source and destination rectangles for the
              * current column. Note that ceilf here is necessary to avoid
              * zero-width rectangles */
-            SDL_Rect src_rect = {ceilf(col * (float)TEXTURE_WIDTH / sprite_size), 0, ceilf((float)TEXTURE_WIDTH / sprite_size), TEXTURE_HEIGHT};
-            SDL_Rect dest_rect = {(screen_x - sprite_size / 2) + col, (WINDOW_HEIGHT - sprite_size) / 2, 1, sprite_size};
+            SDL_Rect src_rect = {ceilf(col * (float)TEXTURE_WIDTH / object_size), 0, ceilf((float)TEXTURE_WIDTH / object_size), TEXTURE_HEIGHT};
+            SDL_Rect dest_rect = {(screen_x - object_size / 2) + col, (WINDOW_HEIGHT - object_size) / 2, 1, object_size};
 
             /* Render the current column of the texture */
-            SDL_RenderCopyEx(renderer, sprite->texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
+            SDL_RenderCopyEx(renderer, object->texture, &src_rect, &dest_rect, 0, NULL, SDL_FLIP_NONE);
         }
     }
 }
 
 void fire_projectile(void) {
-    Sprite *projectile = &sprites[0];
+    Object *projectile = &objects[0];
     if (projectile->is_visible)
         return;
     projectile->direction = (Vector2){cosf(player.direction), sinf(player.direction)};
@@ -851,14 +851,14 @@ void load_maps(const char *filename) {
     map = malloc(map_height * sizeof(map[0]));
     door_map = calloc(map_height * sizeof(door_map[0]), 1);
 
-    /* the first sprite is always the projectile */
-    init_projectile(&sprites[0]);
-    num_sprites++;
+    /* the first object is always the projectile */
+    init_projectile(&objects[0]);
+    num_objects++;
 
     /* need to make sure the player was there */
     bool player_start_found = false;
 
-    /* walk through all map cells, load the map and all the sprites*/
+    /* walk through all map cells, load the map and all the objects*/
     fprintf(stderr, "File: %s\n", filename);
     fprintf(stderr, "Dimensions: %d x %d\n", map_width, map_height);
 
@@ -879,34 +879,34 @@ void load_maps(const char *filename) {
                 player_start_found = true;
                 break;
             case 'p':
-                if (num_sprites >= MAX_SPRITES) {
-                    goto too_many_sprites;
+                if (num_objects >= MAX_OBJECTS) {
+                    goto too_many_objects;
                 }
-                init_poo(&sprites[num_sprites], x, y);
-                num_sprites++;
+                init_poo(&objects[num_objects], x, y);
+                num_objects++;
                 map[y][x] = ' ';
                 break;
             case 'f':
-                if (num_sprites >= MAX_SPRITES) {
-                    goto too_many_sprites;
+                if (num_objects >= MAX_OBJECTS) {
+                    goto too_many_objects;
                 }
-                init_fly(&sprites[num_sprites], x, y);
-                num_sprites++;
+                init_fly(&objects[num_objects], x, y);
+                num_objects++;
                 map[y][x] = ' ';
                 break;
             case '*':
-                if (num_sprites >= MAX_SPRITES) {
-                    goto too_many_sprites;
+                if (num_objects >= MAX_OBJECTS) {
+                    goto too_many_objects;
                 }
-                init_flower(&sprites[num_sprites], x, y);
-                num_sprites++;
+                init_flower(&objects[num_objects], x, y);
+                num_objects++;
                 map[y][x] = ' ';
                 break;
             case '-':
             case '|':
-                init_door(&sprites[num_sprites], x, y);
-                door_map[y][x] = &sprites[num_sprites];
-                num_sprites++;
+                init_door(&objects[num_objects], x, y);
+                door_map[y][x] = &objects[num_objects];
+                num_objects++;
                 break;
             default:
                 continue;
@@ -923,7 +923,7 @@ void load_maps(const char *filename) {
     fclose(file);
     return;
 
-too_many_sprites:
+too_many_objects:
     fprintf(stderr, "No starting position found in the map file: %s\n", filename);
     exit(1);
 }
