@@ -54,7 +54,7 @@ TTF_Font *font = NULL;
 
 Mix_Chunk *door_sound = NULL;
 Mix_Chunk *pain_sound = NULL;
-
+Mix_Chunk *brush_sound = NULL;
 
 int line_height_buffer[RAY_COUNT] = {0};
 
@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
+    if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 128) < 0) {
         printf("Error initializing SDL_mixer: %s\n", Mix_GetError());
         SDL_Quit();
         return 1;
@@ -675,6 +675,9 @@ void projectile_update(Object *projectile, Uint32 elapsed_time) {
 
         if (distance < objects[j].hit_distance) {
             objects[j].hit(&objects[j]);
+
+            Mix_PlayChannel(-1, brush_sound, 0);
+
             goto remove_projectile;
         }
     }
@@ -1134,6 +1137,12 @@ void load_sound(void) {
 
     pain_sound = Mix_LoadWAV("pain.wav");
     if (pain_sound == NULL) {
+        printf("Failed to load sound: %s\n", Mix_GetError());
+        exit(1);
+    }
+
+    brush_sound = Mix_LoadWAV("brush.wav");
+    if (brush_sound == NULL) {
         printf("Failed to load sound: %s\n", Mix_GetError());
         exit(1);
     }
