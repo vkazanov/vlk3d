@@ -87,7 +87,8 @@ SDL_Texture **char_to_texture_table[] = {
 
 /* Game state */
 
-    char **map;
+/* Tile map */
+char **map;
 int map_width;
 int map_height;
 
@@ -95,12 +96,16 @@ Player player = {0, 0, 0};
 
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
+/* Objects are updateable entities. They might represent a sprite (if the
+ * texture is there) */
 typedef struct Sprite Sprite;
 struct Sprite {
     SDL_Texture *texture;
     float x, y;
     Vector2 direction;
     float hit_distance;
+    bool is_updateable;
+    bool is_hittable;
     bool is_visible;
     bool is_harmless;
     void (*update) (Sprite *Sprite, Uint32 elapsed_time);
@@ -108,11 +113,24 @@ struct Sprite {
 
     float distance_to_player;
     float angle_to_player;
+
+    union {
+        struct {
+            bool is_opening;
+            float openness;
+        } door;
+    } as;
 };
 
 #define MAX_SPRITES 50
 Sprite sprites[MAX_SPRITES];
 int num_sprites = 0;
+
+
+/* A map of doors in the game. Each float is a state of the door, i.e. the
+ * openness "persentage" use to either draw door column upon ray hit, or just
+ * ignore it */
+Sprite ***door_map;
 
 
 /* Function prototypes */
@@ -142,12 +160,16 @@ void init_flower(Sprite *sprite, int x, int y);
 void init_projectile(Sprite *sprite);
 void projectile_update(Sprite *sprite, Uint32 elapsed_time);
 
+void init_door(Sprite *sprite, int x, int y);
+void door_hit(Sprite *sprite);
+void door_update(Sprite *sprite, Uint32 elapsed_time);
+
 void update_sprites(Uint32 elapsed_time);
 
 void render_sprites(SDL_Renderer *renderer);
 void fire_projectile(void);
-void free_map(void);
-void load_map(const char *filename);
+void free_maps(void);
+void load_maps(const char *filename);
 void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y);
 void wait_for_key_press();
 
@@ -220,7 +242,7 @@ int main(int argc, char *argv[]) {
     }
 
     load_textures(renderer);
-    load_map("map.txt");
+    load_maps("map.txt");
     Mix_PlayMusic(music, -1);
 
     SDL_Color white = {255, 255, 255, 255};
@@ -241,7 +263,7 @@ int main(int argc, char *argv[]) {
         break;
     }
 
-    free_map();
+    free_maps();
 
     Mix_FreeMusic(music);
     Mix_CloseAudio();
@@ -354,6 +376,7 @@ void render_walls(SDL_Renderer *renderer) {
 
     for (int i = 0; i < RAY_COUNT; i++) {
         float ray_angle = player.direction - FOV / 2.0 + i * angle_per_ray;
+
         char wall_type;
         float tex_offset;
 
@@ -440,22 +463,41 @@ bool is_door_collision(float prev_x, float prev_y, float x, float y, char *wall_
 
     *wall_type = map[map_y][map_x];
 
-    /* horisontal door */
+    Sprite *door_sprite = door_map[map_y][map_x];
+    float openness = door_sprite->as.door.openness;
+
+    /* horizontal door */
     if (map[map_y][map_x] == '-') {
         float y_diff = fabs(fabs(roundf(y) - y) - 0.5);
-        if (y_diff < 0.02f) {
-            *tex_offset = x - floorf(x);
+        float x_diff = x - floorf(x);
+
+        if (y_diff >= 0.02f) {
+            return false;
+        }
+
+        if (x_diff < openness) {
+            *tex_offset = 1 - openness + x_diff;
             return true;
+        } else {
+            return false;
         }
     }
 
     /* if vertical door */
     if (map[map_y][map_x] == '|') {
         float x_diff = fabs(fabs(roundf(x) - x) - 0.5);
-        if (x_diff < 0.02f) {
-            *tex_offset = y - floorf(y);
+        float y_diff = y - floorf(y);
+
+        if (x_diff >= 0.02f) {
+            return false;
+        }
+
+        if (y_diff < openness) {
+            *tex_offset = 1 - openness + y_diff;
             return true;
         }
+
+        return false;
     }
 
     /* unreachable */
@@ -516,6 +558,8 @@ void init_poo(Sprite *sprite, int x, int y) {
         .texture = poo_texture,
         .x = x + 0.5,
         .y = y + 0.5,
+        .is_updateable = true,
+        .is_hittable = true,
         .is_harmless = false,
         .is_visible = true,
         .hit_distance = 0.5,
@@ -524,6 +568,8 @@ void init_poo(Sprite *sprite, int x, int y) {
 }
 
 void poo_hit(Sprite *sprite) {
+    sprite->is_updateable = false;
+    sprite->is_hittable = false;
     sprite->is_harmless = true;
     sprite->is_visible = false;
 }
@@ -533,8 +579,10 @@ void init_fly(Sprite *sprite, int x, int y) {
         .texture = fly_texture,
         .x = x + 0.5,
         .y = y + 0.5,
+        .is_updateable = true,
         .is_harmless = false,
         .is_visible = true,
+        .is_hittable = true,
         .hit_distance = 0.25,
         .update = fly_update,
         .hit = fly_hit
@@ -542,6 +590,8 @@ void init_fly(Sprite *sprite, int x, int y) {
 }
 
 void fly_hit(Sprite *sprite) {
+    sprite->is_updateable = false;
+    sprite->is_hittable = false;
     sprite->is_harmless = true;
     sprite->is_visible = false;
 }
@@ -549,6 +599,8 @@ void fly_hit(Sprite *sprite) {
 void init_projectile(Sprite *sprite) {
     *sprite = (typeof(*sprite)) {
         .texture = brush_texture,
+        .is_updateable = false,
+        .is_hittable = false,
         .is_visible = false,
         .is_harmless = true,
         .hit_distance = 1000,
@@ -565,8 +617,7 @@ void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
     float new_y = projectile->y + dy;
 
     if (is_collision(projectile->x, projectile->y, new_x, new_y)) {
-        projectile->is_visible = false;
-        return;
+        goto remove_projectile;
     }
 
     /* move the project to the new position */
@@ -575,7 +626,7 @@ void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
 
     /* check all other sprites but skip the first one - itself */
     for (int j = 1; j < num_sprites; j++) {
-        if (!sprites[j].is_visible) {
+        if (!sprites[j].is_hittable) {
             continue;
         }
         float dist_x = sprites[j].x - projectile->x;
@@ -583,11 +634,15 @@ void projectile_update(Sprite *projectile, Uint32 elapsed_time) {
         float distance = sqrtf(dist_x * dist_x + dist_y * dist_y);
 
         if (distance < sprites[j].hit_distance) {
-            projectile->is_visible = false;
             sprites[j].hit(&sprites[j]);
-            return;
+            goto remove_projectile;
         }
     }
+    return;
+
+remove_projectile:
+    projectile->is_visible = false;
+    projectile->is_updateable = false;
 }
 
 float random_float(float min, float max) {
@@ -629,6 +684,8 @@ void init_flower(Sprite *sprite, int x, int y) {
         .texture = flower_texture,
         .x = x + 0.5,
         .y = y + 0.5,
+        .is_updateable = false,
+        .is_hittable = false,
         .is_harmless = true,
         .is_visible = true,
     };
@@ -636,12 +693,57 @@ void init_flower(Sprite *sprite, int x, int y) {
 
 void update_sprites(Uint32 elapsed_time) {
     for (int i = 0; i < num_sprites; i++) {
-        if (!sprites[i].is_visible)
+        if (!sprites[i].is_updateable)
             continue;
 
         void (*update_function) = sprites[i].update;
         if (update_function)
             sprites[i].update(&sprites[i], elapsed_time);
+    }
+}
+
+void init_door(Sprite *sprite, int x, int y) {
+    *sprite = (typeof(*sprite)) {
+        .texture = NULL,        /* do not render */
+        .x = x + 0.5,
+        .y = y + 0.5,
+        .hit_distance = 0.5f,
+        .is_updateable = false,
+        .is_hittable = true,
+        .is_harmless = true,
+        .is_visible = false,
+
+        .hit = door_hit,
+        .update = door_update,
+
+        .as.door = {
+            .is_opening = false,
+            .openness = 1.0f
+        }
+    };
+}
+
+void door_hit(Sprite *sprite) {
+    fprintf(stderr, "Door hit!\n");
+    if (sprite->as.door.openness > 0.0f) {
+        sprite->is_updateable = true;
+        sprite->as.door.is_opening = true;
+    }
+}
+
+void door_update(Sprite *sprite, Uint32 elapsed_time) {
+    if (!sprite->as.door.is_opening) {
+        return;
+    }
+    float diff = elapsed_time * 0.002f;
+    fprintf(stderr, "Door openness=%f updating by %f!\n", sprite->as.door.openness, diff);
+    sprite->as.door.openness -= diff;
+    if (sprite->as.door.openness <= 0.0f) {
+        sprite->as.door.is_opening = false;
+        sprite->is_updateable = false;
+        sprite->is_hittable = false;
+        sprite->as.door.openness = 0.0f;
+        fprintf(stderr, "Door open!\n");
     }
 }
 
@@ -737,9 +839,10 @@ void fire_projectile(void) {
     projectile->x = player.x;
     projectile->y = player.y;
     projectile->is_visible = true;
+    projectile->is_updateable = true;
 }
 
-void load_map(const char *filename) {
+void load_maps(const char *filename) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         fprintf(stderr, "Error opening map file: %s\n", filename);
@@ -748,7 +851,8 @@ void load_map(const char *filename) {
 
     fscanf(file, "%d %d\n", &map_width, &map_height);
 
-    map = (char **)malloc(map_height * sizeof(char *));
+    map = malloc(map_height * sizeof(map[0]));
+    door_map = calloc(map_height * sizeof(door_map[0]), 1);
 
     /* the first sprite is always the projectile */
     init_projectile(&sprites[0]);
@@ -763,7 +867,8 @@ void load_map(const char *filename) {
 
     for (int y = 0; y < map_height; y++) {
         /* size = width + newline + null */
-        map[y] = malloc(map_width * sizeof(char) + 2);
+        map[y] = malloc(map_width * sizeof(map[y][0]) + 2);
+        door_map[y] = malloc(map_width * sizeof(door_map[y][0]));
         fgets(map[y], map_width * sizeof(char) + 2, file);
         for (int x = 0; x < map_width; x++) {
             char c = map[y][x];
@@ -800,6 +905,12 @@ void load_map(const char *filename) {
                 num_sprites++;
                 map[y][x] = ' ';
                 break;
+            case '-':
+            case '|':
+                init_door(&sprites[num_sprites], x, y);
+                door_map[y][x] = &sprites[num_sprites];
+                num_sprites++;
+                break;
             default:
                 continue;
             }
@@ -820,11 +931,13 @@ too_many_sprites:
     exit(1);
 }
 
-void free_map(void) {
+void free_maps(void) {
     for (int y = 0; y < map_height; y++) {
         free(map[y]);
+        free(door_map[y]);
     }
     free(map);
+    free(door_map);
 }
 
 void render_text(SDL_Renderer *renderer, const char *message, TTF_Font *font, SDL_Color color, SDL_Color outline_color, int x, int y) {
