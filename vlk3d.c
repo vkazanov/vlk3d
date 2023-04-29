@@ -82,16 +82,16 @@ struct {
     SDL_Texture **texture;
     char *name;
 } name_to_texture_table[] = {
-    { &wall_texture, "wall.png"},
-    { &wall_window_texture, "wall_window.png"},
-    { &wall_door_texture, "wall_door.png"},
-    { &wall_painting_texture, "wall_painting.png"},
-    { &wall_picture_texture, "wall_picture.png"},
-    { &fly_texture, "fly.png"},
-    { &poo_texture, "poo.png"},
-    { &brush_texture, "brush.png"},
-    { &flower_texture, "flower.png"},
-    { &coin_texture, "coin.png"},
+    { &wall_texture, "assets/wall.png"},
+    { &wall_window_texture, "assets/wall_window.png"},
+    { &wall_door_texture, "assets/wall_door.png"},
+    { &wall_painting_texture, "assets/wall_painting.png"},
+    { &wall_picture_texture, "assets/wall_picture.png"},
+    { &fly_texture, "assets/fly.png"},
+    { &poo_texture, "assets/poo.png"},
+    { &brush_texture, "assets/brush.png"},
+    { &flower_texture, "assets/flower.png"},
+    { &coin_texture, "assets/coin.png"},
 };
 
 SDL_Texture **char_to_texture_table[] = {
@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    Mix_Music *music = Mix_LoadMUS("melody.mid");
+    Mix_Music *music = Mix_LoadMUS("assets/melody.mid");
     if (!music) {
         printf("Error loading MIDI file: %s\n", Mix_GetError());
         Mix_CloseAudio();
@@ -1169,19 +1169,19 @@ void free_textures(void) {
 }
 
 void load_sound(void) {
-    door_sound = Mix_LoadWAV("door.wav");
+    door_sound = Mix_LoadWAV("assets/door.wav");
     if (door_sound == NULL) {
         printf("Failed to load sound: %s\n", Mix_GetError());
         exit(1);
     }
 
-    pain_sound = Mix_LoadWAV("pain.wav");
+    pain_sound = Mix_LoadWAV("assets/pain.wav");
     if (pain_sound == NULL) {
         printf("Failed to load sound: %s\n", Mix_GetError());
         exit(1);
     }
 
-    brush_sound = Mix_LoadWAV("brush.wav");
+    brush_sound = Mix_LoadWAV("assets/brush.wav");
     if (brush_sound == NULL) {
         printf("Failed to load sound: %s\n", Mix_GetError());
         exit(1);
