@@ -43,6 +43,13 @@ typedef enum {
     GAME_RESULT_ABORT
 } game_result_t;
 
+/* wall collision check result enum, should be 0 for no collision, other values
+ * for horizontal/vertical hit */
+typedef enum {
+    HIT_NONE = 0,
+    HIT_HORIZONTAL,
+    HIT_VERTICAL,
+} wall_collision_result_t;
 
 #define PLAYER_ROTATION_SPEED 0.05
 #define PLAYER_MOVEMENT_SPEED 0.1
@@ -153,12 +160,12 @@ Object ***door_map;
 game_result_t game_loop(SDL_Renderer *renderer);
 void handle_events(SDL_Event *event, bool *is_running);
 void render_walls(SDL_Renderer *renderer);
-float cast_ray(float angle, char *wall_type, float *tex_offset) ;
+float cast_ray(float angle, char *wall_type, float *tex_offset, wall_collision_result_t *collision_res);
 bool is_wall(int x, int y);
 bool is_within_bounds(int x, int y) ;
 bool is_collision(float x, float y);
 bool is_door_collision(float x, float y, char *wall_type, float *tex_offset);
-bool is_wall_collision(float x, float y, char *wall_type, float *tex_offset);
+wall_collision_result_t is_wall_collision(float x, float y, char *wall_type, float *tex_offset);
 bool is_horizontal_wall(Vector2 position);
 bool has_no_things_to_do();
 
@@ -387,6 +394,17 @@ void render_walls(SDL_Renderer *renderer) {
     SDL_Rect floor_rect = {0, WINDOW_HEIGHT / 2, WINDOW_WIDTH, WINDOW_HEIGHT / 2};
     SDL_RenderFillRect(renderer, &floor_rect);
 
+    /* Values for darker/lighter textures, i.e. fake shading */
+    Uint8 dark_r = 255, dark_g = 255, dark_b = 255;
+    dark_r = (Uint8)SDL_clamp(dark_r + 20, 0, 255);
+    dark_g = (Uint8)SDL_clamp(dark_g + 20, 0, 255);
+    dark_b = (Uint8)SDL_clamp(dark_b + 20, 0, 255);
+    Uint8 light_r = 255, light_g = 255, light_b = 255;
+    light_r = (Uint8)SDL_clamp(light_r - 20, 0, 255);
+    light_g = (Uint8)SDL_clamp(light_g - 20, 0, 255);
+    light_b = (Uint8)SDL_clamp(light_b - 20, 0, 255);
+
+
     /* Draw walls using texture mapping */
     const float rays_per_column = (WINDOW_WIDTH / RAY_COUNT);
     const float angle_per_ray = (FOV / (float)RAY_COUNT);
@@ -396,11 +414,19 @@ void render_walls(SDL_Renderer *renderer) {
 
         char wall_type;
         float tex_offset;
+        wall_collision_result_t wall_collision;
 
-        float raw_distance = cast_ray(ray_angle, &wall_type, &tex_offset);
+        float raw_distance = cast_ray(ray_angle, &wall_type, &tex_offset, &wall_collision);
 
         /* use a conversion table to turn wall_type into a texture for drawing */
         SDL_Texture *texture = *char_to_texture_table[wall_type];
+
+        /* Shade based on wall collision results (horizontal/vertical)*/
+        if (wall_collision == HIT_HORIZONTAL) {
+            SDL_SetTextureColorMod(texture, light_r, light_g, light_b);
+        } else if (wall_collision == HIT_VERTICAL) {
+            SDL_SetTextureColorMod(texture, dark_r, dark_g, dark_b);
+        }
 
         /* Calculate the line height while correcting for the fisheye effect */
         float corrected_distance = raw_distance * cosf(player.direction - ray_angle);
@@ -431,7 +457,7 @@ bool is_within_bounds(int x, int y) {
     return x >= 0 && x < map_width && y >= 0 && y < map_height;
 }
 
-float cast_ray(float angle, char *wall_type, float *tex_offset) {
+float cast_ray(float angle, char *wall_type, float *tex_offset, wall_collision_result_t *collision_res) {
     Vector2 direction = {cosf(angle), sinf(angle)};
     float distance = 0.0;
     Vector2 position = {player.x, player.y};
@@ -440,7 +466,8 @@ float cast_ray(float angle, char *wall_type, float *tex_offset) {
         float new_x = position.x + direction.x * RAY_STEP;
         float new_y = position.y + direction.y * RAY_STEP;
 
-        if (is_wall_collision(new_x, new_y, wall_type, tex_offset)) {
+        *collision_res = is_wall_collision(new_x, new_y, wall_type, tex_offset);
+        if (*collision_res) {
             break;
         }
 
@@ -521,7 +548,7 @@ bool is_door_collision(float x, float y, char *wall_type, float *tex_offset) {
         return false;
 }
 
-bool is_wall_collision(float x, float y, char *wall_type, float *tex_offset) {
+wall_collision_result_t is_wall_collision(float x, float y, char *wall_type, float *tex_offset) {
     int map_x = (int)floor(x);
     int map_y = (int)floor(y);
     *wall_type = '\0';
@@ -529,23 +556,26 @@ bool is_wall_collision(float x, float y, char *wall_type, float *tex_offset) {
     /* if outside of bounds  - counts as wall*/
     if (!is_within_bounds(map_x, map_y)) {
         *wall_type = '1';
-        return true;
+        return HIT_HORIZONTAL;
     }
 
     if (!is_wall(map_x, map_y)) {
-        return false;
+        return HIT_NONE;
     }
 
     *wall_type = map[map_y][map_x];
 
     /* check if horisontal or vertical wall, find texture offset accordingly */
+    wall_collision_result_t result;
     if (fabs(roundf(x) - x) >= fabs(roundf(y) - y)) {
+        result = HIT_HORIZONTAL;
         *tex_offset = x - floorf(x);
     } else {
+        result = HIT_VERTICAL;
         *tex_offset = y - floorf(y);
     }
 
-    return true;
+    return result;
 }
 
 bool has_no_things_to_do() {

@@ -49,7 +49,7 @@ My ideas:
 
 - [X] a better way to load textures/sprites (a table?)
 
-- [ ] simple wall shading wolf3d-style by coloring horizontal/vertical walls differently
+- [X] simple wall shading wolf3d-style by coloring horizontal/vertical walls differently
 
 - [ ] double buffering for cleaner animated feeling
 
