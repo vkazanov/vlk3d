@@ -40,7 +40,6 @@ typedef struct {
 
 typedef enum {
     GAME_RESULT_WIN,
-    GAME_RESULT_DIE,            /* TODO: unused for now */
     GAME_RESULT_ABORT
 } game_result_t;
 
@@ -103,7 +102,7 @@ int map_height;
 
 Player player = {0, 0, 0};
 int coins_collected = 0;
-int enemies_left = 0;
+int todo_left = 0;
 
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
@@ -574,7 +573,7 @@ void init_poo(Object *object, int x, int y) {
         .touch = poo_touch
     };
 
-    enemies_left++;
+    todo_left++;
 }
 
 void poo_hit(Object *object) {
@@ -584,7 +583,7 @@ void poo_hit(Object *object) {
     object->is_visible = false;
     object->is_touchable = false;
 
-    enemies_left--;
+    todo_left--;
 }
 
 void poo_touch(Object *object) {
@@ -615,7 +614,7 @@ void init_fly(Object *object, int x, int y) {
         .hit = fly_hit
     };
 
-    enemies_left++;
+    todo_left++;
 }
 
 void fly_hit(Object *object) {
@@ -625,7 +624,7 @@ void fly_hit(Object *object) {
     object->is_visible = false;
     object->is_touchable = false;
 
-    enemies_left--;
+    todo_left--;
 }
 
 void fly_touch(Object *object) {
@@ -912,32 +911,32 @@ void render_sprites(SDL_Renderer *renderer) {
 void render_ui(SDL_Renderer *renderer) {
     // Convert the coins_collected to a string
     char coin_str[50];
-    char enemy_str[50];
+    char todo_str[50];
     snprintf(coin_str, sizeof(coin_str), "Coins: %d", coins_collected);
-    snprintf(enemy_str, sizeof(coin_str), "Enemies: %d", enemies_left);
+    snprintf(todo_str, sizeof(coin_str), "To do: %d", todo_left);
 
     // Create a surface from the font and string
     SDL_Color font_color = {0, 0, 0, 255}; // White text
     SDL_Surface *coin_text_surface = TTF_RenderText_Solid(font, coin_str, font_color);
-    SDL_Surface *enemy_text_surface = TTF_RenderText_Solid(font, enemy_str, font_color);
+    SDL_Surface *todo_text_surface = TTF_RenderText_Solid(font, todo_str, font_color);
 
     // Create a texture from the surface
     SDL_Texture *coin_text_texture = SDL_CreateTextureFromSurface(renderer, coin_text_surface);
-    SDL_Texture *enemy_text_texture = SDL_CreateTextureFromSurface(renderer, enemy_text_surface);
+    SDL_Texture *todo_text_texture = SDL_CreateTextureFromSurface(renderer, todo_text_surface);
 
     // Set the destination rectangle for the texture
     SDL_Rect coin_dest_rect = {WINDOW_WIDTH - coin_text_surface->w - 10, 10, coin_text_surface->w, coin_text_surface->h};
-    SDL_Rect enemy_dest_rect = {10, 10, enemy_text_surface->w, enemy_text_surface->h};
+    SDL_Rect todo_dest_rect = {10, 10, todo_text_surface->w, todo_text_surface->h};
 
     // Render the text texture
     SDL_RenderCopy(renderer, coin_text_texture, NULL, &coin_dest_rect);
-    SDL_RenderCopy(renderer, enemy_text_texture, NULL, &enemy_dest_rect);
+    SDL_RenderCopy(renderer, todo_text_texture, NULL, &todo_dest_rect);
 
     // Clean up
     SDL_FreeSurface(coin_text_surface);
-    SDL_FreeSurface(enemy_text_surface);
+    SDL_FreeSurface(todo_text_surface);
     SDL_DestroyTexture(coin_text_texture);
-    SDL_DestroyTexture(enemy_text_texture);
+    SDL_DestroyTexture(todo_text_texture);
 }
 
 void fire_projectile(void) {

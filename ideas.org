@@ -45,7 +45,7 @@ My ideas:
 
   - [X] numbers for wall textures
 
-  - [X] letters for mosters and other sprites
+  - [X] letters for monsters and other sprites
 
 - [X] a better way to load textures/sprites (a table?)
 
@@ -54,6 +54,8 @@ My ideas:
 - [ ] double buffering for cleaner animated feeling
 
 - [ ] loading a map from cli args
+
+- [ ] main menu
 
 
 Bugs:
