@@ -71,6 +71,7 @@ SDL_Texture *wall_texture = NULL;
 SDL_Texture *wall_window_texture = NULL;
 SDL_Texture *wall_painting_texture = NULL;
 SDL_Texture *wall_door_texture = NULL;
+SDL_Texture *wall_picture_texture = NULL;
 SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
@@ -82,9 +83,10 @@ struct {
     char *name;
 } name_to_texture_table[] = {
     { &wall_texture, "wall.png"},
-    { &wall_window_texture, "wall_with_window.png"},
-    { &wall_door_texture, "wall_with_door.png"},
+    { &wall_window_texture, "wall_window.png"},
+    { &wall_door_texture, "wall_door.png"},
     { &wall_painting_texture, "wall_painting.png"},
+    { &wall_picture_texture, "wall_picture.png"},
     { &fly_texture, "fly.png"},
     { &poo_texture, "poo.png"},
     { &brush_texture, "brush.png"},
@@ -96,6 +98,7 @@ SDL_Texture **char_to_texture_table[] = {
     ['1'] = &wall_texture,
     ['2'] = &wall_window_texture,
     ['3'] = &wall_painting_texture,
+    ['4'] = &wall_picture_texture,
     ['-'] = &wall_door_texture,
     ['|'] = &wall_door_texture
 };
