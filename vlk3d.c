@@ -116,8 +116,7 @@ int todo_left = 0;
 
 #define ENEMY_PROXIMITY_DISTANCE 0.5
 
-/* Objects are updateable entities. They might represent a object (if the
- * texture is there) */
+/* Objects are actionable non-wall entities.  */
 typedef struct Object Object;
 struct Object {
     SDL_Texture *texture;
@@ -857,7 +856,9 @@ void door_update(Object *object, Uint32 elapsed_time) {
 }
 
 int compare_objects_by_distance(const void *left, const void *right) {
-    return ((Object *)left)->distance_to_player < ((Object *)right)->distance_to_player ? -1 : 1;
+    float left_distance = (*(Object **)left)->distance_to_player;
+    float right_distance = (*(Object **)right)->distance_to_player;
+    return left_distance < right_distance ? 1 : -1;
 }
 
 Object *objects_visible[MAX_OBJECTS] = {0};
@@ -887,9 +888,8 @@ void render_sprites(SDL_Renderer *renderer) {
             continue;
         }
 
-        /* Distance and fisheye effect correction */
+        /* Distance to player */
         float distance_to_object = sqrtf(powf(objects[i].x - player.x, 2) + powf(objects[i].y - player.y, 2));
-        distance_to_object *= cosf(relative_angle);
 
         objects_visible[num_objects_visible] = &objects[i];
         objects_visible[num_objects_visible]->distance_to_player = distance_to_object;
@@ -905,8 +905,9 @@ void render_sprites(SDL_Renderer *renderer) {
     for (int i = 0; i < num_objects_visible; i++) {
         Object *object = objects_visible[i];
 
-        /* Object line height based on the distance to the player  */
-        int line_height = (int)(WINDOW_HEIGHT / object->distance_to_player);
+        /* Object line height based on the distance to the player + fisheye correction */
+        float relative_angle = object->angle_to_player;
+        int line_height = (int)(WINDOW_HEIGHT / (object->distance_to_player * cosf(relative_angle)));
 
         /* Calculate the horizontal position of the enemy on the screen */
         int screen_x = (int)((WINDOW_WIDTH / 2) - tanf(object->angle_to_player) * (WINDOW_WIDTH / 2) / tanf(FOV / 2));
