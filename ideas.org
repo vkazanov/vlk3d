@@ -14,13 +14,13 @@ Nika's ideas:
 
   - [X] flies
 
+  - [X] flowers to water
+
   - [ ] unfinished apples
 
   - [ ] untidy bed
 
   - [ ] dangerous cat paws
-
-  - [ ] flowers to water
 
 - [ ] colorful win/lose letters
 
@@ -50,6 +50,8 @@ My ideas:
 - [X] a better way to load textures/sprites (a table?)
 
 - [X] simple wall shading wolf3d-style by coloring horizontal/vertical walls differently
+
+- [ ] emscripten compilation
 
 - [ ] double buffering for cleaner animated feeling
 
