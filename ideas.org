@@ -60,8 +60,8 @@ My ideas:
 
 Bugs:
 
-- [ ] sometimes going through doors
+- [X] perspective (sprite sorting?)
 
-- [ ] perspective (sprite sorting?)
+- [X] sometimes going through doors
 
 - [ ] enemy touching (too many coins deducted)

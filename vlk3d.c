@@ -140,6 +140,7 @@ struct Object {
 
     union {
         struct {
+            bool is_open;
             bool is_opening;
             float door_width;
         } door;
@@ -165,8 +166,8 @@ void render_walls(SDL_Renderer *renderer);
 float cast_ray(float angle, char *wall_type, float *tex_offset, wall_collision_result_t *collision_res);
 bool is_wall(int x, int y);
 bool is_within_bounds(int x, int y) ;
-bool is_collision(float x, float y);
-bool is_door_collision(float x, float y, char *wall_type, float *tex_offset);
+bool is_move_collision(float x, float y);
+bool is_door_collision(float x, float y, char *wall_type, float *tex_offset, bool check_if_open);
 wall_collision_result_t is_wall_collision(float x, float y, char *wall_type, float *tex_offset);
 bool is_horizontal_wall(Vector2 position);
 bool has_no_things_to_do();
@@ -352,14 +353,14 @@ void handle_events(SDL_Event *event, bool *is_running) {
         } else if (event->key.keysym.sym == SDLK_UP) {
             float new_x = player.x + cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float new_y = player.y + sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            if (!is_collision(new_x, new_y)) {
+            if (!is_move_collision(new_x, new_y)) {
                 player.x = new_x;
                 player.y = new_y;
             }
         } else if (event->key.keysym.sym == SDLK_DOWN) {
             float new_x = player.x - cosf(player.direction) * PLAYER_MOVEMENT_SPEED;
             float new_y = player.y - sinf(player.direction) * PLAYER_MOVEMENT_SPEED;
-            if (!is_collision(new_x, new_y)) {
+            if (!is_move_collision(new_x, new_y)) {
                 player.x = new_x;
                 player.y = new_y;
             }
@@ -473,7 +474,7 @@ float cast_ray(float angle, char *wall_type, float *tex_offset, wall_collision_r
             break;
         }
 
-        if (is_door_collision(new_x, new_y, wall_type, tex_offset)) {
+        if (is_door_collision(new_x, new_y, wall_type, tex_offset, false)) {
             break;
         }
 
@@ -486,11 +487,11 @@ float cast_ray(float angle, char *wall_type, float *tex_offset, wall_collision_r
     return distance;
 }
 
-bool is_collision(float x, float y) {
+bool is_move_collision(float x, float y) {
     char wall_type = '\0';
     float offset = 0.0f;
     return is_wall_collision(x, y, &wall_type, &offset) ||
-        is_door_collision(x, y, &wall_type, &offset);
+        is_door_collision(x, y, &wall_type, &offset, true);
 }
 
 bool is_door(int map_x, int map_y) {
@@ -498,7 +499,7 @@ bool is_door(int map_x, int map_y) {
     return c == '-' || c == '|';
 }
 
-bool is_door_collision(float x, float y, char *wall_type, float *tex_offset) {
+bool is_door_collision(float x, float y, char *wall_type, float *tex_offset, bool check_if_open) {
     int map_x = (int)floor(x);
     int map_y = (int)floor(y);
 
@@ -512,42 +513,53 @@ bool is_door_collision(float x, float y, char *wall_type, float *tex_offset) {
     Object *door_object = door_map[map_y][map_x];
     float door_width = door_object->as.door.door_width;
 
+    /* for movememnt purposes closed and partially closed doors are not transparent */
+    if (check_if_open && !door_object->as.door.is_open) {
+        return true;
+    }
+
     /* horizontal door */
     if (map[map_y][map_x] == '-') {
+        /* distance to door tile horisontal middle line */
         float y_diff = fabs(fabs(roundf(y) - y) - 0.5);
-        float x_diff = x - floorf(x);
 
+        /* door width is 0.02 x 2 */
         if (y_diff >= 0.02f) {
             return false;
         }
 
+        /* check if we hit a partially open door */
+        float x_diff = x - floorf(x);
         if (x_diff < door_width) {
             *tex_offset = 1 - door_width + x_diff;
             return true;
-        } else {
-            return false;
         }
+
+        return false;
     }
 
-    /* if vertical door */
+    /* vertical door */
     if (map[map_y][map_x] == '|') {
-            float x_diff = fabs(fabs(roundf(x) - x) - 0.5);
-            float y_diff = y - floorf(y);
+        /* distance to door tile vertical middle line */
+        float x_diff = fabs(fabs(roundf(x) - x) - 0.5);
 
-            if (x_diff >= 0.02f) {
-                return false;
-            }
-
-            if (y_diff < door_width) {
-                *tex_offset = 1 - door_width + y_diff;
-                return true;
-            }
-
+        /* door width is 0.02 x 2 */
+        if (x_diff >= 0.02f) {
             return false;
         }
 
-        /* unreachable */
+        /* check if we hit a partially open door */
+        float y_diff = y - floorf(y);
+        if (y_diff < door_width) {
+            *tex_offset = 1 - door_width + y_diff;
+            return true;
+        }
+
         return false;
+    }
+
+    /* unreachable */
+    return false;
 }
 
 wall_collision_result_t is_wall_collision(float x, float y, char *wall_type, float *tex_offset) {
@@ -687,7 +699,7 @@ void projectile_update(Object *projectile, Uint32 elapsed_time) {
     float new_x = projectile->x + dx;
     float new_y = projectile->y + dy;
 
-    if (is_collision(new_x, new_y)) {
+    if (is_move_collision(new_x, new_y)) {
         goto remove_projectile;
     }
 
@@ -816,7 +828,7 @@ void init_door(Object *object, int x, int y) {
         .texture = NULL,        /* do not render */
         .x = x + 0.5,
         .y = y + 0.5,
-        .hit_distance = 0.5f,
+        .hit_distance = 0.6f,
         .is_updateable = false,
         .is_hittable = true,
         .is_harmless = true,
@@ -826,6 +838,7 @@ void init_door(Object *object, int x, int y) {
         .update = door_update,
 
         .as.door = {
+            .is_open = false,
             .is_opening = false,
             .door_width = 1.0f
         }
@@ -833,7 +846,7 @@ void init_door(Object *object, int x, int y) {
 }
 
 void door_hit(Object *object) {
-    if (object->as.door.door_width > 0.0f) {
+    if (!object->as.door.is_open || !object->as.door.is_opening) {
         object->is_updateable = true;
         object->as.door.is_opening = true;
 
@@ -848,6 +861,7 @@ void door_update(Object *object, Uint32 elapsed_time) {
     float diff = elapsed_time * 0.002f;
     object->as.door.door_width -= diff;
     if (object->as.door.door_width <= 0.0f) {
+        object->as.door.is_open = true;
         object->as.door.is_opening = false;
         object->is_updateable = false;
         object->is_hittable = false;
