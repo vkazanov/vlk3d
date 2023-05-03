@@ -75,7 +75,8 @@ SDL_Texture *wall_picture_texture = NULL;
 SDL_Texture *fly_texture = NULL;
 SDL_Texture *poo_texture = NULL;
 SDL_Texture *brush_texture = NULL;
-SDL_Texture *flower_texture = NULL;
+SDL_Texture *flower_unwatered_texture = NULL;
+SDL_Texture *flower_watered_texture = NULL;
 SDL_Texture *coin_texture = NULL;
 
 struct {
@@ -90,7 +91,8 @@ struct {
     { &fly_texture, "assets/fly.png"},
     { &poo_texture, "assets/poo.png"},
     { &brush_texture, "assets/brush.png"},
-    { &flower_texture, "assets/flower.png"},
+    { &flower_unwatered_texture, "assets/flower_unwatered.png"},
+    { &flower_watered_texture, "assets/flower_watered.png"},
     { &coin_texture, "assets/coin.png"},
 };
 
@@ -144,6 +146,10 @@ struct Object {
             bool is_opening;
             float door_width;
         } door;
+        struct {
+            SDL_Texture *texture_watered;
+            bool is_watered;
+        } flower;
     } as;
 };
 
@@ -182,6 +188,7 @@ void fly_update(Object *object, Uint32 elapsed_time);
 void fly_touch(Object *object);
 
 void init_flower(Object *object, int x, int y);
+void touch_flower(Object *object);
 
 void init_coin(Object *object, int x, int y);
 void touch_coin(Object *object);
@@ -767,14 +774,31 @@ void fly_update(Object *object, Uint32 elapsed_time) {
 
 void init_flower(Object *object, int x, int y) {
     *object = (typeof(*object)) {
-        .texture = flower_texture,
+        .texture = flower_unwatered_texture,
         .x = x + 0.5,
         .y = y + 0.5,
         .is_updateable = false,
         .is_hittable = false,
         .is_harmless = true,
         .is_visible = true,
+        .touch_distance = 0.5,
+        .is_touchable = true,
+        .touch = touch_flower,
+        .as.flower = {
+            .is_watered = false,
+            .texture_watered = flower_watered_texture
+        }
     };
+
+    todo_left++;
+}
+
+void touch_flower(Object *object) {
+    object->is_touchable = false;
+    object->as.flower.is_watered = true;
+    object->texture = object->as.flower.texture_watered;
+
+    todo_left--;
 }
 
 void init_coin(Object *object, int x, int y) {
