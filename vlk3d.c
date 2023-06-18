@@ -9,12 +9,6 @@
 #include <SDL2/SDL_ttf.h>
 #include <SDL2/SDL_mixer.h>
 
-/* The simplest game skeleton.
-
-   See the Makefile for how to compile
-*/
-
-
 /* Constants */
 
 #define WINDOW_WIDTH 1366
@@ -166,9 +160,10 @@ Object ***door_map;
 
 /* Function prototypes */
 
-game_result_t game_loop(SDL_Renderer *renderer);
+game_result_t game_loop(void);
+
 void handle_events(SDL_Event *event, bool *is_running);
-void render_walls(SDL_Renderer *renderer);
+void render_walls();
 float cast_ray(float angle, char *wall_type, float *tex_offset, wall_collision_result_t *collision_res);
 bool is_wall(int x, int y);
 bool is_within_bounds(int x, int y) ;
@@ -202,9 +197,9 @@ void door_update(Object *object, Uint32 elapsed_time);
 
 void update_objects(Uint32 elapsed_time);
 
-void render_sprites(SDL_Renderer *renderer);
-void render_text(SDL_Renderer *renderer, const char *message, SDL_Color color, SDL_Color outline_color, int x, int y);
-void render_ui(SDL_Renderer *renderer);
+void render_sprites(void);
+void render_text(const char *message, SDL_Color color, SDL_Color outline_color, int x, int y);
+void render_ui(void);
 
 void fire_projectile(void);
 void free_maps(void);
@@ -214,10 +209,14 @@ void wait_for_key_press();
 void load_sound(void);
 void free_sound(void);
 
-void load_textures(SDL_Renderer *renderer);
+void load_textures(void);
 void free_textures(void);
 
+SDL_Window *window = NULL;
+SDL_Renderer *renderer = NULL;
+
 int main(int argc, char *argv[]) {
+    fprintf(stderr, "Starting game...\n");
     srand(time(NULL));
 
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
@@ -239,7 +238,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    if (IMG_Init(IMG_INIT_PNG) != IMG_INIT_PNG) {
+    if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
         printf("Failed to initialize SDL_image: %s\n", IMG_GetError());
         SDL_Quit();
         return 1;
@@ -252,7 +251,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    font = TTF_OpenFont("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 48);
+    font = TTF_OpenFont("assets/DejaVuSans.ttf", 48);
     if (font == NULL) {
         fprintf(stderr, "Failed to load font: %s\n", TTF_GetError());
         TTF_Quit();
@@ -261,12 +260,12 @@ int main(int argc, char *argv[]) {
     }
 
 
-    SDL_Window *window = SDL_CreateWindow("Nika's Room",
-                                          SDL_WINDOWPOS_UNDEFINED,
-                                          SDL_WINDOWPOS_UNDEFINED,
-                                          WINDOW_WIDTH,
-                                          WINDOW_HEIGHT,
-                                          SDL_WINDOW_OPENGL);
+    window = SDL_CreateWindow("Nika's Room",
+                              SDL_WINDOWPOS_UNDEFINED,
+                              SDL_WINDOWPOS_UNDEFINED,
+                              WINDOW_WIDTH,
+                              WINDOW_HEIGHT,
+                              SDL_WINDOW_SHOWN);
 
     if (window == NULL) {
         fprintf(stderr, "Window could not be created: %s\n", SDL_GetError());
@@ -274,7 +273,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
     if (renderer == NULL) {
         fprintf(stderr, "Renderer could not be created: %s\n", SDL_GetError());
         SDL_DestroyWindow(window);
@@ -283,15 +282,16 @@ int main(int argc, char *argv[]) {
     }
 
     load_sound();
-    load_textures(renderer);
-    load_maps("map.txt");
+    load_textures();
+    load_maps("assets/map.txt");
     Mix_PlayMusic(music, -1);
 
     SDL_Color white = {255, 255, 255, 255};
-    SDL_Color black = {0, 0, 0, 255}; // New outline color
-    switch (game_loop(renderer)) {
+    SDL_Color black = {0, 0, 0, 255};
+
+    switch (game_loop()) {
     case GAME_RESULT_WIN:
-        render_text(renderer, "You win!", white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24);
+        render_text("You win!", white, black, WINDOW_WIDTH / 2 - 75, WINDOW_HEIGHT / 2 - 24);
         SDL_RenderPresent(renderer);
         wait_for_key_press();
         break;
@@ -317,7 +317,8 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
-game_result_t game_loop(SDL_Renderer *renderer) {
+game_result_t game_loop(void)
+{
     bool is_running = true;
     SDL_Event event;
     Uint32 current_time, last_time = SDL_GetTicks();
@@ -330,20 +331,24 @@ game_result_t game_loop(SDL_Renderer *renderer) {
         while (SDL_PollEvent(&event))
             handle_events(&event, &is_running);
 
-        if (has_no_things_to_do())
+        if (has_no_things_to_do()) {
             return GAME_RESULT_WIN;
+        }
 
         update_objects(elapsed_time);
 
-        render_walls(renderer);
-        render_sprites(renderer);
-        render_ui(renderer);
+        render_walls();
+        render_sprites();
+        render_ui();
 
         SDL_RenderPresent(renderer);
         SDL_Delay(16);
     }
-
+#if __EMSCRIPTEN__
+    return;
+#else
     return GAME_RESULT_ABORT;
+#endif
 }
 
 void handle_events(SDL_Event *event, bool *is_running) {
@@ -390,7 +395,7 @@ void handle_events(SDL_Event *event, bool *is_running) {
     }
 }
 
-void render_walls(SDL_Renderer *renderer) {
+void render_walls(void) {
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
     SDL_RenderClear(renderer);
 
@@ -901,7 +906,7 @@ int compare_objects_by_distance(const void *left, const void *right) {
 
 Object *objects_visible[MAX_OBJECTS] = {0};
 
-void render_sprites(SDL_Renderer *renderer) {
+void render_sprites(void) {
     /* Collect sprites that are visible and qsort them based on line height (aka
      * distance). This'll solve the sprite overlapping problem. */
 
@@ -980,7 +985,7 @@ void render_sprites(SDL_Renderer *renderer) {
     }
 }
 
-void render_ui(SDL_Renderer *renderer) {
+void render_ui(void) {
     // Convert the coins_collected to a string
     char coin_str[50];
     char todo_str[50];
@@ -1128,7 +1133,7 @@ void free_maps(void) {
     free(door_map);
 }
 
-void render_text(SDL_Renderer *renderer, const char *message, SDL_Color color, SDL_Color outline_color, int x, int y) {
+void render_text(const char *message, SDL_Color color, SDL_Color outline_color, int x, int y) {
     SDL_Surface *text_surface = TTF_RenderText_Blended(font, message, color);
     SDL_Surface *outline_surface = TTF_RenderText_Blended(font, message, outline_color);
 
@@ -1179,7 +1184,7 @@ void wait_for_key_press() {
     }
 }
 
-void load_textures(SDL_Renderer *renderer) {
+void load_textures(void) {
     /* iterate over the name_to_texture_table and load surfaces/textures */
     for (int i = 0; i < sizeof(name_to_texture_table) / sizeof(name_to_texture_table[0]); i++) {
         SDL_Surface *surface = IMG_Load(name_to_texture_table[i].name);
